@@ -170,9 +170,6 @@
     -webkit-backdrop-filter: blur(25px) saturate(190%);
     box-shadow: var(--apple-shadow-board);
     transform-origin: top right;
-    will-change: transform, opacity;
-    backface-visibility: hidden;
-    transform: translateZ(0);
     animation: apple-widget-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
@@ -529,6 +526,15 @@ function resetText(atUnix) {
   return `${humanDuration(left)}后重置`;
 }
 
+// 倒计时原地刷新：整页重渲染会让 backdrop-filter 重新取样背景，透明窗口上表现为闪烁
+let tickers = [];
+function bindReset(el, atUnix, prefix = '') {
+  const target = el.querySelector('.metric-reset') || el;
+  const update = () => { target.textContent = prefix + resetText(atUnix); };
+  update();
+  tickers.push(update);
+}
+
 function createMetricCell(label, usedPercent, reset) {
   const sev = severity(usedPercent);
   const pct = Math.max(0, Math.min(100, Math.round(usedPercent)));
@@ -631,11 +637,15 @@ function renderDevin(r) {
 
   if (typeof r.dailyRemainingPercent === 'number') {
     const used = 100 - r.dailyRemainingPercent;
-    grid.appendChild(createMetricCell('今日已用', used, resetText(r.dailyResetAtUnix)));
+    const cellEl = createMetricCell('今日已用', used, resetText(r.dailyResetAtUnix));
+    if (r.dailyResetAtUnix) bindReset(cellEl, r.dailyResetAtUnix);
+    grid.appendChild(cellEl);
   }
   if (typeof r.weeklyRemainingPercent === 'number') {
     const used = 100 - r.weeklyRemainingPercent;
-    grid.appendChild(createMetricCell('本周已用', used, resetText(r.weeklyResetAtUnix)));
+    const cellEl = createMetricCell('本周已用', used, resetText(r.weeklyResetAtUnix));
+    if (r.weeklyResetAtUnix) bindReset(cellEl, r.weeklyResetAtUnix);
+    grid.appendChild(cellEl);
   }
   card.appendChild(grid);
 
@@ -714,7 +724,9 @@ function renderCursor(r) {
     : r.cycleEnd
       ? `至 ${r.cycleEnd.slice(5, 10)}`
       : '月周期';
-  grid.appendChild(cell('Auto', autoPct, cycleReset));
+  const autoCell = cell('Auto', autoPct, cycleReset);
+  if (r.cycleResetUnix) bindReset(autoCell, r.cycleResetUnix);
+  grid.appendChild(autoCell);
 
   // 2. API 额度池
   const apiPct = typeof r.apiPercentUsed === 'number' ? r.apiPercentUsed : null;
@@ -732,7 +744,9 @@ function renderCursor(r) {
       : r.grokError
         ? 'Grok 读取失败'
         : '周周期';
-  grid.appendChild(cell('Grok Bot', grokPct, grokSub, grokExhausted ? 'danger' : null));
+  const grokCell = cell('Grok Bot', grokPct, grokSub, grokExhausted ? 'danger' : null);
+  if (!grokExhausted && r.grokResetUnix) bindReset(grokCell, r.grokResetUnix);
+  grid.appendChild(grokCell);
 
   card.appendChild(grid);
 
@@ -742,6 +756,7 @@ function renderCursor(r) {
   // Cursor 侧失败但 Grok 侧成功时也要露出失败，否则看不出上面为什么是「无数据」
   const resetMsg = r.error ? 'Cursor 额度读取失败' : r.cycleResetUnix ? `重置: ${resetText(r.cycleResetUnix)}` : '';
   footerLine.innerHTML = `<span>${totalMsg}</span><span>${resetMsg}</span>`;
+  if (!r.error && r.cycleResetUnix) bindReset(footerLine.lastElementChild, r.cycleResetUnix, '重置: ');
   card.appendChild(footerLine);
 
   return card;
@@ -833,6 +848,7 @@ function worstSeverity(results) {
 
 function render(payload) {
   lastResults = payload;
+  tickers = [];
   const { results, config, at } = payload;
   if (config) cfg = { ...cfg, ...config };
   content.textContent = '';
@@ -858,6 +874,7 @@ function render(payload) {
 api.onRefreshStart(() => btnRefresh.classList.add('spinning'));
 api.onUpdate((payload) => {
   btnRefresh.classList.remove('spinning');
+  if (lastResults && JSON.stringify(lastResults.results) === JSON.stringify(payload.results)) return;
   render(payload);
   reportSize();
 });
@@ -876,7 +893,7 @@ function reportSize() {
   });
 }
 
-setInterval(() => { if (lastResults) { render(lastResults); reportSize(); } }, 30000);
+setInterval(() => { for (const tick of tickers) tick(); }, 30000);
 
 (async () => {
   const c = await api.getConfig();

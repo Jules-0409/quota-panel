@@ -3,6 +3,7 @@ name = "quota-panel-tauri"
 version = "0.1.0"
 description = "Lightweight cross-platform quota panel for Factory, Devin, Cursor and Grok"
 license = "Apache-2.0"
+repository = "https://github.com/Jules-0409/quota-panel"
 edition = "2021"
 
 [lib]

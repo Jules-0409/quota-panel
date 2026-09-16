@@ -42,17 +42,29 @@ pub async fn resize_window(
 ) -> Result<(), String> {
     // 保持右上角贴边锚定：当窗口宽度变大时，向左侧延伸，右边缘位置保持不变
     let scale_factor = window.scale_factor().unwrap_or(1.0);
+    let mut move_x = None;
     if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
         let cur_logical_w = size.width as f64 / scale_factor;
         let diff_w = width - cur_logical_w;
         if diff_w.abs() > 1.0 {
-            let cur_logical_x = pos.x as f64 / scale_factor;
-            let new_logical_x = cur_logical_x - diff_w;
-            let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition {
-                x: new_logical_x,
-                y: pos.y as f64 / scale_factor,
-            }));
+            move_x = Some(pos.x as f64 / scale_factor - diff_w);
         }
+        // 透明窗口上每一次多余的 setFrame 都是一次可见的重新合成，没变化就直接返回
+        let cur_logical_h = size.height as f64 / scale_factor;
+        if move_x.is_none()
+            && (cur_logical_w - width).abs() < 0.5
+            && (cur_logical_h - height).abs() < 0.5
+        {
+            return Ok(());
+        }
+    }
+
+    if let Some(x) = move_x {
+        let y = window
+            .outer_position()
+            .map(|p| p.y as f64 / scale_factor)
+            .unwrap_or(0.0);
+        let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
     }
 
     window
