@@ -1,0 +1,14 @@
+node_modules/
+dist/
+out/
+*.log
+.DS_Store
+Thumbs.db
+.env
+.env.local
+
+# Rust 构建产物。实测这个目录有 5.6 GB，一旦提交仓库就没法看了
+target/
+
+# tauri-build 每次构建都会重新生成，不是源码
+**/src-tauri/gen/

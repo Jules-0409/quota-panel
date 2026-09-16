@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>额度监控</title>
+<style>
+  /* Apple Design System: macOS Sonoma / Sequoia Widget & Dynamic Island Aesthetic */
+  :root {
+    --apple-bg: rgba(28, 28, 32, 0.85);
+    --apple-bg-pill: rgba(12, 12, 14, 0.90);
+    --apple-card: rgba(255, 255, 255, 0.06);
+    --apple-card-hover: rgba(255, 255, 255, 0.10);
+    --apple-card-border: rgba(255, 255, 255, 0.08);
+    --apple-border: rgba(255, 255, 255, 0.16);
+    
+    --apple-label: #ffffff;
+    --apple-secondary: rgba(235, 235, 245, 0.60);
+    --apple-tertiary: rgba(235, 235, 245, 0.38);
+    
+    /* Apple System Colors */
+    --apple-green: #30d158;
+    --apple-orange: #ff9f0a;
+    --apple-red: #ff453a;
+    --apple-blue: #0a84ff;
+    
+    --apple-track: rgba(255, 255, 255, 0.12);
+    --apple-shadow-board: 0 10px 24px -4px rgba(0, 0, 0, 0.45), 0 4px 8px -2px rgba(0, 0, 0, 0.25), inset 0 0.5px 0.5px rgba(255, 255, 255, 0.25);
+    --apple-pill-shadow: inset 0 0.5px 0.5px rgba(255, 255, 255, 0.28), inset 0 -0.5px 0.5px rgba(0, 0, 0, 0.5);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --apple-bg: rgba(245, 245, 247, 0.88);
+      --apple-bg-pill: rgba(255, 255, 255, 0.94);
+      --apple-card: rgba(0, 0, 0, 0.04);
+      --apple-card-hover: rgba(0, 0, 0, 0.07);
+      --apple-card-border: rgba(0, 0, 0, 0.06);
+      --apple-border: rgba(0, 0, 0, 0.10);
+      
+      --apple-label: #1d1d1f;
+      --apple-secondary: rgba(60, 60, 67, 0.65);
+      --apple-tertiary: rgba(60, 60, 67, 0.40);
+      
+      --apple-green: #34c759;
+      --apple-orange: #ff9500;
+      --apple-red: #ff3b30;
+      --apple-blue: #007aff;
+      
+      --apple-track: rgba(0, 0, 0, 0.08);
+      --apple-shadow-board: 0 12px 28px -4px rgba(0, 0, 0, 0.10), 0 4px 10px -2px rgba(0, 0, 0, 0.05), inset 0 0.5px 0.5px rgba(255, 255, 255, 0.95);
+      --apple-pill-shadow: 0 1.5px 4px rgba(0, 0, 0, 0.08), inset 0 0.5px 0.5px rgba(255, 255, 255, 0.95);
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  html, body {
+    height: 100%;
+    margin: 0; padding: 0;
+    background: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Helvetica Neue", system-ui, sans-serif;
+    color: var(--apple-label);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-user-select: none; user-select: none;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .panel {
+    display: flex; flex-direction: column;
+    width: max-content;
+    background: transparent;
+  }
+
+  .panel[data-mode="collapsed"] {
+    padding: 0;
+  }
+  .panel[data-mode="expanded"] {
+    padding: 8px 14px 20px 14px;
+  }
+
+  .panel[data-mode="collapsed"] .board { display: none; }
+  .panel[data-mode="expanded"] .pill { display: none; }
+
+  /* 灵动岛药丸 (收起态) */
+  .pill {
+    display: flex; align-items: center; gap: 8px;
+    height: 32px; padding: 0 10px 0 11px;
+    cursor: pointer;
+    background: var(--apple-bg-pill);
+    border: 0.5px solid var(--apple-border);
+    border-radius: 9999px;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow: var(--apple-pill-shadow);
+    transition: opacity 0.15s ease, filter 0.15s ease;
+  }
+  .pill:hover {
+    filter: brightness(1.06);
+  }
+  .pill:active {
+    filter: brightness(0.95);
+  }
+
+  /* 发光指示灯 */
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--apple-secondary); flex: none;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .dot.ok {
+    background: var(--apple-green);
+    box-shadow: 0 0 8px rgba(48, 209, 88, 0.55);
+  }
+  .dot.warn {
+    background: var(--apple-orange);
+    box-shadow: 0 0 8px rgba(255, 159, 10, 0.55);
+  }
+  .dot.danger {
+    background: var(--apple-red);
+    box-shadow: 0 0 8px rgba(255, 69, 58, 0.6);
+  }
+
+  .pill-stats {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+  .pill-chip {
+    display: inline-flex; align-items: baseline; gap: 3.5px;
+  }
+  .pill-chip .k {
+    font-size: 10px; font-weight: 600;
+    color: var(--apple-secondary);
+    letter-spacing: -0.2px;
+  }
+  .pill-chip .v {
+    font-size: 12px; font-weight: 700;
+    letter-spacing: -0.2px;
+    color: var(--apple-label);
+  }
+  .pill-chip .v.warn { color: var(--apple-orange); }
+  .pill-chip .v.danger { color: var(--apple-red); }
+
+  .pill-divider {
+    width: 3px; height: 3px; border-radius: 50%;
+    background: var(--apple-tertiary);
+  }
+
+  .pill-chev {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px;
+    color: var(--apple-tertiary);
+    transition: color 0.15s, transform 0.15s;
+  }
+  .pill:hover .pill-chev {
+    color: var(--apple-secondary);
+  }
+
+  /* 展开态：macOS Widget 卡片 */
+  .board {
+    display: flex; flex-direction: column;
+    width: 340px;
+    background: var(--apple-bg);
+    border: 0.5px solid var(--apple-border);
+    border-radius: 20px;
+    backdrop-filter: blur(25px) saturate(190%);
+    -webkit-backdrop-filter: blur(25px) saturate(190%);
+    box-shadow: var(--apple-shadow-board);
+    transform-origin: top right;
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+    animation: apple-widget-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .board.closing {
+    animation: apple-widget-out 0.12s cubic-bezier(0.3, 0, 0.8, 0.15) both;
+  }
+
+  @keyframes apple-widget-in {
+    0% {
+      opacity: 0;
+      transform: scale(0.95) translateY(-4px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  @keyframes apple-widget-out {
+    0% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(0.95) translateY(-4px);
+    }
+  }
+
+  /* 苹果顶栏 */
+  header {
+    display: flex; align-items: center; gap: 7px;
+    padding: 10px 12px 9px 14px;
+    border-bottom: 0.5px solid var(--apple-card-border);
+    cursor: default;
+  }
+  header .title {
+    font-size: 12.5px; font-weight: 600;
+    letter-spacing: -0.2px;
+    color: var(--apple-label);
+  }
+  header .spacer { flex: 1; }
+
+  /* 图标按钮 */
+  .apple-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; padding: 0;
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--apple-secondary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, transform 0.15s;
+  }
+  .apple-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: var(--apple-label);
+  }
+  .apple-btn:active { transform: scale(0.92); }
+
+  .apple-btn-close {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--apple-label);
+    margin-left: 2px;
+  }
+  .apple-btn-close:hover {
+    background: rgba(255, 255, 255, 0.22);
+  }
+
+  svg {
+    width: 12px; height: 12px; display: block;
+    fill: none; stroke: currentColor; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .apple-btn.spinning svg { animation: apple-spin 0.8s linear infinite; }
+  @keyframes apple-spin { to { transform: rotate(360deg); } }
+
+  main {
+    padding: 10px 12px 11px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+
+  .section-card {
+    background: var(--apple-card);
+    border: 0.5px solid var(--apple-card-border);
+    border-radius: 14px;
+    padding: 9px 10px 10px;
+  }
+
+  .card-header {
+    display: flex; align-items: baseline; gap: 6px;
+    margin-bottom: 7px;
+  }
+  .card-title {
+    font-size: 12px; font-weight: 600;
+    color: var(--apple-label);
+    letter-spacing: -0.2px;
+  }
+  .card-meta {
+    font-size: 10px; color: var(--apple-secondary);
+    flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .apple-badge {
+    padding: 1.5px 6px; border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 9.5px; font-weight: 500;
+    color: var(--apple-secondary);
+  }
+  .apple-badge.stale {
+    color: var(--apple-orange);
+    background: rgba(255, 159, 10, 0.14);
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 7px;
+  }
+
+  .metric-cell {
+    background: rgba(255, 255, 255, 0.04);
+    border: 0.5px solid rgba(255, 255, 255, 0.04);
+    border-radius: 9px;
+    padding: 6px 7px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .metric-top {
+    display: flex; align-items: baseline; justify-content: space-between;
+  }
+  .metric-label {
+    font-size: 10px; font-weight: 500;
+    color: var(--apple-secondary);
+  }
+  .metric-pct {
+    font-size: 12px; font-weight: 700;
+    letter-spacing: -0.3px;
+    font-variant-numeric: tabular-nums;
+    color: var(--apple-label);
+  }
+  .metric-pct.warn { color: var(--apple-orange); }
+  .metric-pct.danger { color: var(--apple-red); }
+
+  .gauge-track {
+    height: 4px; border-radius: 9999px;
+    background: var(--apple-track);
+    overflow: hidden;
+  }
+  .gauge-fill {
+    height: 100%; border-radius: 9999px;
+    transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    min-width: 2px;
+  }
+  .gauge-fill.ok { background: var(--apple-green); }
+  .gauge-fill.warn { background: var(--apple-orange); }
+  .gauge-fill.danger { background: var(--apple-red); }
+
+  .metric-reset {
+    font-size: 9px; color: var(--apple-tertiary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .card-footer-line {
+    margin-top: 6px; padding-top: 5px;
+    border-top: 0.5px solid rgba(255, 255, 255, 0.05);
+    display: flex; justify-content: space-between;
+    font-size: 9.5px; color: var(--apple-tertiary);
+  }
+
+  footer {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px 8px;
+    border-top: 0.5px solid var(--apple-card-border);
+    color: var(--apple-tertiary);
+    font-size: 9.5px;
+  }
+  footer .spacer { flex: 1; }
+</style>
+</head>
+<body>
+  <div class="panel" id="panel" data-mode="collapsed">
+
+    <!-- 灵动岛小胶囊 (收起态) -->
+    <div class="pill" id="pill" title="点击展开详细用量看板" data-tauri-drag-region>
+      <span class="dot" id="dot-pill"></span>
+      <span class="pill-stats" id="pill-stats"><span style="color:var(--apple-tertiary);font-size:11px">读取中…</span></span>
+      <span class="pill-chev">
+        <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></svg>
+      </span>
+    </div>
+
+    <!-- 展开态：macOS Widget 卡片 -->
+    <div class="board" id="board">
+      <header data-tauri-drag-region>
+        <span class="dot" id="dot-head"></span>
+        <span class="title">用量监控</span>
+        <span class="spacer" data-tauri-drag-region></span>
+        
+        <!-- 刷新 -->
+        <button class="apple-btn" id="btn-refresh" title="立即刷新">
+          <svg viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" /><path d="M20.5 4.2v5h-5" /></svg>
+        </button>
+        <!-- 收起为胶囊 -->
+        <button class="apple-btn apple-btn-close" id="btn-close-card" title="收起为胶囊">
+          <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" /></svg>
+        </button>
+      </header>
+
+      <main id="content">
+        <div style="text-align:center;padding:24px;color:var(--apple-secondary)">正在同步用量…</div>
+      </main>
+
+      <footer>
+        <span id="updated">—</span>
+        <span class="spacer"></span>
+        <span id="refresh-hint">5m 自动更新</span>
+      </footer>
+    </div>
+  </div>
+
+<script>
+'use strict';
+
+// Tauri v2 IPC Bridge
+const invoke = window.__TAURI__?.core?.invoke;
+const listen = window.__TAURI__?.event?.listen;
+
+const api = {
+  async getQuota() {
+    if (invoke) return await invoke('get_quota');
+    return null;
+  },
+  async refresh() {
+    if (invoke) return await invoke('refresh_quota');
+    return null;
+  },
+  async getConfig() {
+    if (invoke) return await invoke('get_config');
+    return { refreshMinutes: 5, warnPercent: 70, dangerPercent: 90 };
+  },
+  async resize(width, height) {
+    if (invoke) {
+      try {
+        await invoke('resize_window', { width, height });
+      } catch (e) {
+        console.warn('resize failed', e);
+      }
+    }
+  },
+  onUpdate(cb) {
+    if (listen) {
+      listen('quota-updated', (event) => cb(event.payload));
+    }
+  },
+  onRefreshStart(cb) {
+    if (listen) {
+      listen('refresh-start', () => cb());
+    }
+  }
+};
+
+const panelEl = document.getElementById('panel');
+const pillEl = document.getElementById('pill');
+const pillStats = document.getElementById('pill-stats');
+const content = document.getElementById('content');
+const dotPill = document.getElementById('dot-pill');
+const dotHead = document.getElementById('dot-head');
+const updatedEl = document.getElementById('updated');
+const refreshHint = document.getElementById('refresh-hint');
+const btnRefresh = document.getElementById('btn-refresh');
+const btnCloseCard = document.getElementById('btn-close-card');
+
+const WINDOW_LABELS = { fiveHour: '5 小时', weekly: '7 天', monthly: '30 天' };
+
+let cfg = { warnPercent: 70, dangerPercent: 90 };
+let lastResults = null;
+let collapseTimer = null;
+let isCollapsing = false;
+
+function setMode(mode) {
+  if (panelEl.dataset.mode === mode) { reportSize(); return; }
+  panelEl.dataset.mode = mode;
+  reportSize();
+}
+
+function expand() {
+  clearTimeout(collapseTimer);
+  isCollapsing = false;
+  const boardEl = document.getElementById('board');
+  if (boardEl) boardEl.classList.remove('closing');
+  setMode('expanded');
+}
+
+function collapse() {
+  clearTimeout(collapseTimer);
+  if (panelEl.dataset.mode !== 'expanded' || isCollapsing) return;
+
+  isCollapsing = true;
+  const boardEl = document.getElementById('board');
+  if (boardEl) boardEl.classList.add('closing');
+
+  collapseTimer = setTimeout(() => {
+    isCollapsing = false;
+    if (boardEl) boardEl.classList.remove('closing');
+    setMode('collapsed');
+  }, 130);
+}
+
+// 彻底禁止 macOS WebKit 的上下拖拽橡皮筋弹性回弹（Rubber-banding）
+document.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
+// 1. 点击胶囊展开
+pillEl.addEventListener('click', () => expand());
+
+// 2. 点击卡片顶部的「✕」按钮，收起为胶囊
+btnCloseCard.addEventListener('click', (e) => {
+  e.stopPropagation();
+  collapse();
+});
+
+btnRefresh.addEventListener('click', async () => {
+  btnRefresh.classList.add('spinning');
+  await api.refresh();
+  btnRefresh.classList.remove('spinning');
+});
+
+function severity(used) {
+  if (used >= (cfg.dangerPercent ?? 90)) return 'danger';
+  if (used >= (cfg.warnPercent ?? 70)) return 'warn';
+  return 'ok';
+}
+
+function humanDuration(sec) {
+  if (sec === null || sec === undefined) return '-';
+  if (sec <= 0) return '已重置';
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (d > 0) return `${d}天${h}h`;
+  if (h > 0) return `${h}h${m}m`;
+  return `${m}m`;
+}
+
+function resetText(atUnix) {
+  if (!atUnix) return '';
+  const left = atUnix - Math.floor(Date.now() / 1000);
+  if (left <= 0) return '已重置';
+  return `${humanDuration(left)}后重置`;
+}
+
+function createMetricCell(label, usedPercent, reset) {
+  const sev = severity(usedPercent);
+  const pct = Math.max(0, Math.min(100, Math.round(usedPercent)));
+  const cell = document.createElement('div');
+  cell.className = 'metric-cell';
+  cell.innerHTML = `
+    <div class="metric-top">
+      <span class="metric-label">${label}</span>
+      <span class="metric-pct ${sev}">${pct}%</span>
+    </div>
+    <div class="gauge-track">
+      <div class="gauge-fill ${sev}" style="width:${pct}%"></div>
+    </div>
+    <div class="metric-reset">${reset || '实时计费'}</div>
+  `;
+  return cell;
+}
+
+function renderFactory(r) {
+  const card = document.createElement('div');
+  card.className = 'section-card';
+  if (!r || !r.ok) {
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-title">Factory</span>
+        <span class="card-meta" style="color:var(--apple-red)">读取失败: ${r?.error || ''}</span>
+      </div>
+    `;
+    return card;
+  }
+
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="card-title">Factory</span>
+      <span class="card-meta">${r.orgId || ''}</span>
+    </div>
+  `;
+
+  if (r.windows?.standard) {
+    const grid = document.createElement('div');
+    grid.className = 'grid-3';
+    for (const [key, w] of Object.entries(r.windows.standard)) {
+      const reset = w.secondsRemaining != null ? `${humanDuration(w.secondsRemaining)}后` : '';
+      grid.appendChild(createMetricCell(WINDOW_LABELS[key] || key, w.usedPercent, reset));
+    }
+    card.appendChild(grid);
+  }
+
+  if (r.windows?.core && Object.keys(r.windows.core).length > 0) {
+    const coreTitle = document.createElement('div');
+    coreTitle.style.cssText = 'font-size:10.5px;color:var(--apple-secondary);margin:7px 0 4px;font-weight:500;';
+    coreTitle.textContent = '免费模型池 (Core)';
+    card.appendChild(coreTitle);
+
+    const gridCore = document.createElement('div');
+    gridCore.className = 'grid-3';
+    for (const [key, w] of Object.entries(r.windows.core)) {
+      const reset = w.secondsRemaining != null ? `${humanDuration(w.secondsRemaining)}后` : '';
+      gridCore.appendChild(createMetricCell(WINDOW_LABELS[key] || key, w.usedPercent, reset));
+    }
+    card.appendChild(gridCore);
+  }
+
+  const cents = r.extraUsageBalanceCents ?? 0;
+  const footerLine = document.createElement('div');
+  footerLine.className = 'card-footer-line';
+  footerLine.innerHTML = `
+    <span>超额策略: ${r.overagePreference || '默认'}</span>
+    <span>预付余额: $${(cents / 100).toFixed(2)}</span>
+  `;
+  card.appendChild(footerLine);
+
+  return card;
+}
+
+function renderDevin(r) {
+  const card = document.createElement('div');
+  card.className = 'section-card';
+  if (!r || !r.ok) {
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-title">Devin</span>
+        <span class="card-meta" style="color:var(--apple-red)">读取失败: ${r?.error || ''}</span>
+      </div>
+    `;
+    return card;
+  }
+
+  const badge = r.stale ? '<span class="apple-badge stale">本地缓存</span>' : '';
+  const meta = [r.planName, r.email].filter(Boolean).join(' · ');
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="card-title">Devin</span>${badge}
+      <span class="card-meta">${meta}</span>
+    </div>
+  `;
+
+  const grid = document.createElement('div');
+  grid.className = 'grid-2';
+
+  if (typeof r.dailyRemainingPercent === 'number') {
+    const used = 100 - r.dailyRemainingPercent;
+    grid.appendChild(createMetricCell('今日已用', used, resetText(r.dailyResetAtUnix)));
+  }
+  if (typeof r.weeklyRemainingPercent === 'number') {
+    const used = 100 - r.weeklyRemainingPercent;
+    grid.appendChild(createMetricCell('本周已用', used, resetText(r.weeklyResetAtUnix)));
+  }
+  card.appendChild(grid);
+
+  const footerLine = document.createElement('div');
+  footerLine.className = 'card-footer-line';
+  let acu = '';
+  if (typeof r.acuConsumed === 'number' && typeof r.acuLimit === 'number' && r.acuLimit > 0) {
+    acu = `ACU: ${r.acuConsumed} / ${r.acuLimit}`;
+  }
+  let renew = '';
+  if (r.planEndUnix) {
+    const left = r.planEndUnix - Math.floor(Date.now() / 1000);
+    if (left > 0) renew = `续费: ${humanDuration(left)}后`;
+  }
+  footerLine.innerHTML = `<span>${acu}</span><span>${renew}</span>`;
+  card.appendChild(footerLine);
+
+  return card;
+}
+
+function renderCursor(r) {
+  const card = document.createElement('div');
+  card.className = 'section-card';
+  if (!r || !r.ok) {
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-title">Cursor</span>
+        <span class="card-meta" style="color:var(--apple-red)"></span>
+      </div>
+    `;
+    // 错误文案里可能夹带服务端返回的原始 body，用 textContent 写入而不是 innerHTML
+    card.querySelector('.card-meta').textContent = `读取失败: ${r?.error || r?.grokError || '未知错误'}`;
+    return card;
+  }
+
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="card-title">Cursor</span>
+      <span class="card-meta"></span>
+    </div>
+  `;
+  card.querySelector('.card-meta').textContent =
+    [r.planName || r.membershipType?.toUpperCase() || 'Pro', r.email].filter(Boolean).join(' · ');
+
+  // 三个额度池共用这套外壳。pct 为 null 时显示「无数据」而不是 0%，
+  // 因为 Cursor 的 usage-summary 和 Grok 的接口是各自独立失败的
+  const cell = (label, pct, sub, sevOverride) => {
+    const has = typeof pct === 'number';
+    const sev = sevOverride || (has ? severity(pct) : 'ok');
+    const el = document.createElement('div');
+    el.className = 'metric-cell';
+    el.innerHTML = `
+      <div class="metric-top">
+        <span class="metric-label">${label}</span>
+        <span class="metric-pct ${sev}">${has ? `${Math.min(100, Math.max(0, Math.round(pct)))}%` : '无数据'}</span>
+      </div>
+      <div class="gauge-track">
+        <div class="gauge-fill ${sev}" style="width:${has ? Math.min(100, Math.max(2, pct)) : 0}%"></div>
+      </div>
+      <div class="metric-reset">${sub}</div>
+    `;
+    return el;
+  };
+
+  const grid = document.createElement('div');
+  grid.className = 'grid-3';
+
+  // 1. Auto 额度池（接口没给百分比时，退回用 fast requests 的余量推算）
+  const autoPct = typeof r.autoPercentUsed === 'number'
+    ? r.autoPercentUsed
+    : typeof r.fastRequestsRemainingPercent === 'number'
+      ? 100 - r.fastRequestsRemainingPercent
+      : null;
+  const cycleReset = r.cycleResetUnix
+    ? resetText(r.cycleResetUnix)
+    : r.cycleEnd
+      ? `至 ${r.cycleEnd.slice(5, 10)}`
+      : '月周期';
+  grid.appendChild(cell('Auto', autoPct, cycleReset));
+
+  // 2. API 额度池
+  const apiPct = typeof r.apiPercentUsed === 'number' ? r.apiPercentUsed : null;
+  grid.appendChild(cell('API', apiPct,
+    apiPct === null ? '按量计费' : `剩余 ${Math.max(0, Math.round(100 - apiPct))}%`));
+
+  // 3. Grok Bot 的周额度。Grok Bot 是 Cursor 的产品，走的是同一个 Cursor 登录态。
+  //    服务端说没额度可用时直接判红，不然百分比还没到阈值却显示绿色会误导
+  const grokPct = typeof r.grokPercentUsed === 'number' ? r.grokPercentUsed : null;
+  const grokExhausted = r.grokHasAvailableUsage === false;
+  const grokSub = grokExhausted
+    ? '额度已耗尽'
+    : r.grokResetUnix
+      ? resetText(r.grokResetUnix)
+      : r.grokError
+        ? 'Grok 读取失败'
+        : '周周期';
+  grid.appendChild(cell('Grok Bot', grokPct, grokSub, grokExhausted ? 'danger' : null));
+
+  card.appendChild(grid);
+
+  const footerLine = document.createElement('div');
+  footerLine.className = 'card-footer-line';
+  const totalMsg = typeof r.totalPercentUsed === 'number' ? `综合用量: ${Math.round(r.totalPercentUsed)}%` : '';
+  // Cursor 侧失败但 Grok 侧成功时也要露出失败，否则看不出上面为什么是「无数据」
+  const resetMsg = r.error ? 'Cursor 额度读取失败' : r.cycleResetUnix ? `重置: ${resetText(r.cycleResetUnix)}` : '';
+  footerLine.innerHTML = `<span>${totalMsg}</span><span>${resetMsg}</span>`;
+  card.appendChild(footerLine);
+
+  return card;
+}
+
+function renderPill(results) {
+  const chips = [];
+
+  const f = results?.factory;
+  if (f && f.ok) {
+    const pcts = [];
+    for (const g of [f.windows?.standard, f.windows?.core]) {
+      for (const w of Object.values(g || {})) pcts.push(w.usedPercent);
+    }
+    if (pcts.length) {
+      const hot = Math.max(...pcts);
+      chips.push({ key: 'Factory', text: `${Math.round(hot)}%`, sev: severity(hot) });
+    }
+  } else if (f) {
+    chips.push({ key: 'Factory', text: '!', sev: 'danger' });
+  }
+
+  const d = results?.devin;
+  if (d && d.ok) {
+    const pcts = [];
+    if (typeof d.dailyRemainingPercent === 'number') pcts.push(100 - d.dailyRemainingPercent);
+    if (typeof d.weeklyRemainingPercent === 'number') pcts.push(100 - d.weeklyRemainingPercent);
+    if (pcts.length) {
+      const hot = Math.max(...pcts);
+      chips.push({ key: 'Devin', text: `${Math.round(hot)}%`, sev: severity(hot) });
+    }
+  } else if (d) {
+    chips.push({ key: 'Devin', text: '!', sev: 'danger' });
+  }
+
+  // Grok Bot 已并入 Cursor 卡片，药丸上也不再单列：只报三个池子里最紧的那个
+  const c = results?.cursor;
+  if (c && c.ok) {
+    const pcts = [c.autoPercentUsed, c.apiPercentUsed, c.grokPercentUsed]
+      .filter((v) => typeof v === 'number');
+    const hot = pcts.length ? Math.max(...pcts) : null;
+    const sev = c.grokHasAvailableUsage === false ? 'danger' : hot === null ? 'ok' : severity(hot);
+    chips.push({ key: 'Cursor', text: hot === null ? '-' : `${Math.round(hot)}%`, sev });
+  } else if (c) {
+    chips.push({ key: 'Cursor', text: '!', sev: 'danger' });
+  }
+
+  if (!chips.length) {
+    pillStats.innerHTML = '<span style="color:var(--apple-tertiary)">暂无数据</span>';
+    return;
+  }
+
+  pillStats.innerHTML = chips
+    .map((c) => `<span class="pill-chip"><span class="k">${c.key}</span><span class="v ${c.sev === 'ok' ? '' : c.sev}">${c.text}</span></span>`)
+    .join('<span class="pill-divider"></span>');
+}
+
+function worstSeverity(results) {
+  const pcts = [];
+  const f = results?.factory;
+  if (f?.ok) for (const w of Object.values(f.windows?.standard || {})) pcts.push(w.usedPercent);
+  if (f && !f.ok) return 'danger';
+
+  const d = results?.devin;
+  if (d?.ok && !d.stale) {
+    if (typeof d.dailyRemainingPercent === 'number') pcts.push(100 - d.dailyRemainingPercent);
+    if (typeof d.weeklyRemainingPercent === 'number') pcts.push(100 - d.weeklyRemainingPercent);
+  }
+  if (d && !d.ok) return 'danger';
+
+  const c = results?.cursor;
+  if (c?.ok) {
+    // 三个额度池的真实百分比（含并入的 Grok Bot），不再用 fastRequests 当代理
+    for (const v of [c.autoPercentUsed, c.apiPercentUsed, c.grokPercentUsed]) {
+      if (typeof v === 'number') pcts.push(v);
+    }
+    if (c.grokHasAvailableUsage === false) return 'danger';
+  }
+  if (c && !c.ok) return 'danger';
+
+  let worst = 'ok';
+  for (const p of pcts) {
+    const s = severity(p);
+    if (s === 'danger') worst = 'danger';
+    else if (s === 'warn' && worst === 'ok') worst = 'warn';
+  }
+  return worst;
+}
+
+function render(payload) {
+  lastResults = payload;
+  const { results, config, at } = payload;
+  if (config) cfg = { ...cfg, ...config };
+  content.textContent = '';
+
+  if (!results) {
+    content.innerHTML = '<div style="text-align:center;padding:24px;color:var(--apple-secondary)">暂无数据</div>';
+    renderPill(null);
+    return;
+  }
+
+  if (results.factory) content.appendChild(renderFactory(results.factory));
+  if (results.devin) content.appendChild(renderDevin(results.devin));
+  if (results.cursor) content.appendChild(renderCursor(results.cursor));
+
+  const worst = worstSeverity(results);
+  dotPill.className = 'dot ' + worst;
+  dotHead.className = 'dot ' + worst;
+  renderPill(results);
+
+  if (at) updatedEl.textContent = `更新于 ${new Date(at).toLocaleTimeString()}`;
+}
+
+api.onRefreshStart(() => btnRefresh.classList.add('spinning'));
+api.onUpdate((payload) => {
+  btnRefresh.classList.remove('spinning');
+  render(payload);
+  reportSize();
+});
+
+let lastW = 0;
+let lastH = 0;
+function reportSize() {
+  requestAnimationFrame(() => {
+    const r = panelEl.getBoundingClientRect();
+    const w = Math.ceil(r.width) + 1;
+    const h = Math.ceil(r.height) + 1;
+    if (Math.abs(w - lastW) < 2 && Math.abs(h - lastH) < 2) return;
+    lastW = w;
+    lastH = h;
+    api.resize(w, h);
+  });
+}
+
+setInterval(() => { if (lastResults) { render(lastResults); reportSize(); } }, 30000);
+
+(async () => {
+  const c = await api.getConfig();
+  cfg = { ...cfg, ...c };
+  refreshHint.textContent = `${c.refreshMinutes || 5}m 自动更新`;
+  reportSize();
+  const q = await api.getQuota();
+  if (q) render(q);
+})();
+</script>
+</body>
+</html>

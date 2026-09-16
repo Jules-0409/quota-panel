@@ -1,0 +1,25 @@
+[package]
+name = "quota-panel-tauri"
+version = "0.1.0"
+description = "Lightweight cross-platform quota panel for Factory, Devin, Cursor and Grok"
+license = "Apache-2.0"
+edition = "2021"
+
+[lib]
+name = "quota_panel_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "http2", "charset"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "macros", "sync"] }
+aes = "0.8"
+ghash = "0.5"
+ctr = "0.9"
+base64 = "0.22"
+rusqlite = { version = "0.32", features = ["bundled"] }
