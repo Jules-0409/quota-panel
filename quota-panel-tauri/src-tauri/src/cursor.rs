@@ -175,9 +175,9 @@ fn load_cursor_auth() -> Result<CursorAuth, String> {
     }
 
     if token.is_empty() {
-        let mut msg = "未检测到 Cursor Access Token，请确认已在 Cursor 中登录".to_string();
+        let mut msg = "cursor.no_token".to_string();
         if let Some(e) = db_error {
-            msg = format!("{msg}（读取 state.vscdb 失败：{e}）");
+            msg = format!("cursor.no_token_db: {e}");
         }
         return Err(msg);
     }
@@ -243,7 +243,7 @@ async fn fetch_usage_summary(
         req
     })
     .await
-    .map_err(|e| format!("网络请求失败: {e}"))?;
+    .map_err(|e| format!("cursor.net_failed: {e}"))?;
 
     if !resp.status().is_success() {
         let status = resp.status();
@@ -253,7 +253,7 @@ async fn fetch_usage_summary(
 
     resp.json::<serde_json::Value>()
         .await
-        .map_err(|e| format!("解析 JSON 响应失败: {e}"))
+        .map_err(|e| format!("cursor.json_parse_failed: {e}"))
 }
 
 #[derive(Debug, Deserialize)]
@@ -301,13 +301,13 @@ async fn fetch_grok_usage(client: &reqwest::Client, token: &str) -> GrokUsage {
     .await
     {
         Ok(r) => r,
-        Err(e) => return failed(format!("网络请求失败: {e}")),
+        Err(e) => return failed(format!("grok.net_failed: {e}")),
     };
 
     if !resp.status().is_success() {
         let code = resp.status();
         return failed(if code.as_u16() == 401 {
-            "Cursor 登录态已失效，请在 Cursor 中重新登录".into()
+            "cursor.auth_expired".into()
         } else {
             let body = resp.text().await.unwrap_or_default();
             format!("HTTP {code}: {}", body.chars().take(200).collect::<String>())
@@ -316,7 +316,7 @@ async fn fetch_grok_usage(client: &reqwest::Client, token: &str) -> GrokUsage {
 
     let data = match resp.json::<SandUsageStatus>().await {
         Ok(d) => d,
-        Err(e) => return failed(format!("解析响应失败: {e}")),
+        Err(e) => return failed(format!("grok.parse_failed: {e}")),
     };
 
     GrokUsage {
@@ -360,7 +360,7 @@ pub async fn query_cursor_quota(client: &reqwest::Client) -> CursorQuota {
                 id: "cursor".into(),
                 name: "Cursor".into(),
                 fetched_at: now,
-                error: Some(format!("读取 Cursor 登录态的任务失败: {join_err}")),
+                error: Some(format!("cursor.auth_task_failed: {join_err}")),
                 ..Default::default()
             };
         }

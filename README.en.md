@@ -92,6 +92,8 @@ bundles use `cargo tauri build` (requires
 - **Tray icon** (menu bar): left-click shows and focuses the window; the right-click menu has
   "Refresh quotas now" and "Quit Quota Panel".
 - Data refreshes **every 5 minutes** by default; the card footer shows the last update time.
+- **Language follows the OS**: a Chinese system locale renders the UI, the tray menu and all
+  error messages in Chinese, anything else renders English. There is no in-app switch.
 
 ## Known limitations
 

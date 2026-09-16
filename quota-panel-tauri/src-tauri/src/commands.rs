@@ -35,6 +35,29 @@ pub async fn get_config(state: State<'_, Arc<AppState>>) -> Result<AppConfig, St
 }
 
 #[tauri::command]
+pub async fn set_locale(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    locale: String,
+) -> Result<(), String> {
+    let norm = if locale.to_lowercase().starts_with("zh") { "zh" } else { "en" };
+    {
+        let mut guard = state.locale.lock().await;
+        if *guard == norm {
+            return Ok(());
+        }
+        *guard = norm.to_string();
+    }
+
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let menu = crate::build_tray_menu(&app, norm).map_err(|e| e.to_string())?;
+        let _ = tray.set_menu(Some(menu));
+        let _ = tray.set_tooltip(Some(crate::tray_labels(norm).2));
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn resize_window(
     window: WebviewWindow,
     width: f64,

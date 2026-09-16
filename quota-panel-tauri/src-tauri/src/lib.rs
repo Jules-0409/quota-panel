@@ -20,10 +20,32 @@ use crate::models::{AppConfig, QuotaPayload, QuotaResults};
 pub struct AppState {
     pub cached_quota: Mutex<Option<QuotaPayload>>,
     pub config: Mutex<AppConfig>,
+    /// 界面语言，启动时由 UI 按 navigator.language 上报（set_locale）。
+    /// 后端错误一律发语言无关的 key，翻译在 UI 做；这里只影响托盘菜单文案。
+    pub locale: Mutex<String>,
     /// 三个 fetcher 共用的 HTTP client：`reqwest::Client` 内部是 Arc，clone 很便宜，
     /// 连接池和 TLS 配置只建一次。User-Agent 在这里统一设成如实报自己名字的全局值；
     /// 真正按数据源不同的头（如 Cursor 的 Cookie）才在各 fetcher 里按请求设置。
     pub client: reqwest::Client,
+}
+
+/// 托盘菜单 / tooltip 的文案，按语言取
+pub(crate) fn tray_labels(locale: &str) -> (&'static str, &'static str, &'static str) {
+    if locale == "zh" {
+        ("立即刷新额度", "退出 Quota Panel", "Quota Panel - AI 额度监控")
+    } else {
+        ("Refresh quotas now", "Quit Quota Panel", "Quota Panel - AI quota monitor")
+    }
+}
+
+pub(crate) fn build_tray_menu(
+    app: &tauri::AppHandle,
+    locale: &str,
+) -> tauri::Result<Menu<tauri::Wry>> {
+    let (refresh_txt, quit_txt, _) = tray_labels(locale);
+    let quit_i = MenuItem::with_id(app, "quit", quit_txt, true, None::<&str>)?;
+    let refresh_i = MenuItem::with_id(app, "refresh", refresh_txt, true, None::<&str>)?;
+    Menu::with_items(app, &[&refresh_i, &quit_i])
 }
 
 fn now_millis() -> i64 {
@@ -84,6 +106,7 @@ pub fn run() {
     let state = Arc::new(AppState {
         cached_quota: Mutex::new(None),
         config: Mutex::new(AppConfig::default()),
+        locale: Mutex::new("en".into()),
         client: http_client,
     });
 
@@ -95,19 +118,18 @@ pub fn run() {
             commands::get_quota,
             commands::refresh_quota,
             commands::get_config,
-            commands::resize_window
+            commands::resize_window,
+            commands::set_locale
         ])
         .setup(move |app| {
-            // Setup system tray menu
-            let quit_i = MenuItem::with_id(app, "quit", "退出 Quota Panel", true, None::<&str>)?;
-            let refresh_i = MenuItem::with_id(app, "refresh", "立即刷新额度", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&refresh_i, &quit_i])?;
+            // Setup system tray menu（初始英文，UI 启动后按系统语言 set_locale 重建）
+            let menu = build_tray_menu(app.handle(), "en")?;
 
             let icon = app.default_window_icon().cloned();
 
             let mut tray_builder = TrayIconBuilder::with_id("main-tray")
                 .menu(&menu)
-                .tooltip("Quota Panel - AI 额度监控")
+                .tooltip(tray_labels("en").2)
                 .show_menu_on_left_click(false);
 
             if let Some(ic) = icon {

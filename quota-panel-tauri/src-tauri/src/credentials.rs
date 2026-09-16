@@ -57,14 +57,14 @@ fn open_vscdb_readonly(db_path: &Path) -> Result<Connection, String> {
             let rw_flags = OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX;
             let conn = Connection::open_with_flags(db_path, rw_flags).map_err(|rw_err| {
                 format!(
-                    "无法打开 SQLite 数据库 {}（只读失败：{}；降级读写也失败：{}）",
+                    "cred.sqlite_open: path={} ro={} rw={}",
                     db_path.display(),
                     ro_err,
                     rw_err
                 )
             })?;
             conn.pragma_update(None, "query_only", true).map_err(|e| {
-                format!("无法把 {} 设为只读查询模式：{}", db_path.display(), e)
+                format!("cred.sqlite_readonly_mode: path={} err={}", db_path.display(), e)
             })?;
             conn
         }
@@ -91,7 +91,7 @@ pub(crate) fn read_vscdb_items(
 
     let mut stmt = conn
         .prepare("SELECT value FROM ItemTable WHERE key = ?1")
-        .map_err(|e| format!("查询 {} 的 ItemTable 失败：{}", db_path.display(), e))?;
+        .map_err(|e| format!("cred.sqlite_query: path={} err={}", db_path.display(), e))?;
 
     let mut out = HashMap::new();
     for key in keys {
@@ -108,7 +108,7 @@ pub(crate) fn read_vscdb_items(
             Err(rusqlite::Error::QueryReturnedNoRows) => {}
             Err(e) => {
                 return Err(format!(
-                    "从 {} 读取键 {} 失败：{}",
+                    "cred.key_read: path={} key={} err={}",
                     db_path.display(),
                     key,
                     e
@@ -372,7 +372,7 @@ fn decrypt_factory_payload(
         diff |= computed_tag[i] ^ tag[i];
     }
     if diff != 0 {
-        return Err("解密失败：加密密钥不匹配".into());
+        return Err("cred.decrypt_key_mismatch".into());
     }
 
     // 3. J1 = J0 + 1 (最后4字节大端自增) 作为 CTR 解密的初始块
@@ -411,7 +411,7 @@ pub fn load_devin_token() -> Result<(String, String), String> {
                         if let Some((_, v)) = trimmed.split_once('=') {
                             let clean = v.trim().trim_matches('"').trim_matches('\'');
                             if !clean.is_empty() {
-                                return Ok((clean.to_string(), "Devin CLI 凭据".to_string()));
+                                return Ok((clean.to_string(), "Devin CLI credentials".to_string()));
                             }
                         }
                     }
@@ -472,21 +472,21 @@ pub fn load_devin_token() -> Result<(String, String), String> {
             Ok(v) => {
                 if let Some(key) = v.get("apiKey").and_then(|k| k.as_str()) {
                     if !key.is_empty() {
-                        return Ok((key.to_string(), "Devin Desktop 登录态".to_string()));
+                        return Ok((key.to_string(), "Devin Desktop session".to_string()));
                     }
                 }
             }
             Err(e) => db_errors.push(format!(
-                "解析 {} 里的 windsurfAuthStatus 失败：{}",
+                "cred.devin_windsurf_parse: path={} err={}",
                 db_path.display(),
                 e
             )),
         }
     }
 
-    let mut err = "No valid Devin login session or credentials found".to_string();
+    let mut err = "devin.no_session".to_string();
     if !db_errors.is_empty() {
-        err = format!("{}（读取 state.vscdb 时出错：{}）", err, db_errors.join("；"));
+        err = format!("devin.no_session: state.vscdb errors: {}", db_errors.join("; "));
     }
     Err(err)
 }

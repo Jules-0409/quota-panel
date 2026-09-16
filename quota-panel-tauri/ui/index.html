@@ -424,6 +424,15 @@ const api = {
       }
     }
   },
+  async setLocale(locale) {
+    if (invoke) {
+      try {
+        await invoke('set_locale', { locale });
+      } catch (e) {
+        console.warn('set_locale failed', e);
+      }
+    }
+  },
   onUpdate(cb) {
     if (listen) {
       listen('quota-updated', (event) => cb(event.payload));
@@ -447,7 +456,136 @@ const refreshHint = document.getElementById('refresh-hint');
 const btnRefresh = document.getElementById('btn-refresh');
 const btnCloseCard = document.getElementById('btn-close-card');
 
-const WINDOW_LABELS = { fiveHour: '5 小时', weekly: '7 天', monthly: '30 天' };
+// 界面语言跟随系统：中文系统显示中文，其余显示英文。
+// 后端错误是语言无关的 key（见 ERROR_TEXT），统一在这里翻译，保证两端文案不散架。
+const LANG = (navigator.language || 'en').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+const TEXT = {
+  zh: {
+    'app.title': '用量监控', 'pill.title': '点击展开详细用量看板',
+    'btn.refresh': '立即刷新', 'btn.close': '收起为胶囊',
+    'loading.pill': '读取中…', 'loading.board': '正在同步用量…',
+    'footer.updated': '更新于 {0}', 'footer.auto': '{0}m 自动更新',
+    'empty': '暂无数据', 'card.read_failed': '读取失败', 'unknown': '未知错误',
+    'devin.stale': '本地缓存', 'devin.daily': '今日已用', 'devin.weekly': '本周已用',
+    'win.fiveHour': '5 小时', 'win.weekly': '7 天', 'win.monthly': '30 天',
+    'factory.core': '免费模型池 (Core)', 'factory.overage': '超额策略', 'factory.default': '默认',
+    'factory.prepaid': '预付余额', 'cell.realtime': '实时计费', 'cell.no_data': '无数据',
+    'dur.day_hour': '{0}天{1}h', 'dur.hour_min': '{0}h{1}m', 'dur.min': '{0}m',
+    'dur.day': '{0}天', 'dur.hour': '{0}h',
+    'reset.done': '已重置', 'reset.in': '{0}后重置', 'window.in': '{0}后',
+    'devin.renew': '续费: {0}后',
+    'cursor.monthly': '月周期', 'cursor.until': '至 {0}', 'cursor.metered': '按量计费',
+    'cursor.remaining': '剩余 {0}%', 'cursor.footer_failed': 'Cursor 额度读取失败',
+    'total.prefix': '综合用量: ',
+    'grok.exhausted': '额度已耗尽', 'grok.read_failed': 'Grok 读取失败', 'grok.weekly': '周周期',
+  },
+  en: {
+    'app.title': 'Quota Monitor', 'pill.title': 'Click to expand the usage board',
+    'btn.refresh': 'Refresh now', 'btn.close': 'Collapse to pill',
+    'loading.pill': 'Loading…', 'loading.board': 'Syncing usage…',
+    'footer.updated': 'Updated {0}', 'footer.auto': '{0}m auto refresh',
+    'empty': 'No data yet', 'card.read_failed': 'Read failed', 'unknown': 'unknown error',
+    'devin.stale': 'local cache', 'devin.daily': 'Used today', 'devin.weekly': 'Used this week',
+    'win.fiveHour': '5 hours', 'win.weekly': '7 days', 'win.monthly': '30 days',
+    'factory.core': 'Free model pool (Core)', 'factory.overage': 'Overage policy', 'factory.default': 'default',
+    'factory.prepaid': 'Prepaid balance', 'cell.realtime': 'real-time billing', 'cell.no_data': 'no data',
+    'dur.day_hour': '{0}d {1}h', 'dur.hour_min': '{0}h {1}m', 'dur.min': '{0}m',
+    'dur.day': '{0}d', 'dur.hour': '{0}h',
+    'reset.done': 'reset', 'reset.in': 'resets in {0}', 'window.in': 'in {0}',
+    'devin.renew': 'renews in {0}',
+    'cursor.monthly': 'monthly cycle', 'cursor.until': 'until {0}', 'cursor.metered': 'metered',
+    'cursor.remaining': '{0}% left', 'cursor.footer_failed': 'Cursor quota read failed',
+    'total.prefix': 'Combined: ',
+    'grok.exhausted': 'quota exhausted', 'grok.read_failed': 'Grok read failed', 'grok.weekly': 'weekly cycle',
+  },
+};
+function t(key, ...args) {
+  let s = TEXT[LANG][key] || TEXT.en[key] || key;
+  args.forEach((a, i) => { s = s.split('{' + i + '}').join(a); });
+  return s;
+}
+
+const ERROR_TEXT = {
+  zh: {
+    'cred.sqlite_open': '无法只读打开本地 SQLite 凭据库',
+    'cred.sqlite_readonly_mode': '无法把本地库设为只读查询模式',
+    'cred.sqlite_query': '查询本地凭据表失败',
+    'cred.key_read': '读取本地凭据键失败',
+    'cred.decrypt_key_mismatch': '解密失败：加密密钥不匹配',
+    'cred.devin_windsurf_parse': '解析 Devin 登录态失败',
+    'devin.no_session': '没找到有效的 Devin 登录态或凭据',
+    'factory.credential_task_failed': '读取 Factory 凭据的任务失败',
+    'factory.auth_expired': 'Factory 登录态已失效，请重新登录 droid',
+    'cursor.no_token': '未检测到 Cursor Access Token，请确认已在 Cursor 中登录',
+    'cursor.no_token_db': '读取 Cursor state.vscdb 失败',
+    'cursor.net_failed': '网络请求失败',
+    'cursor.json_parse_failed': '解析 JSON 响应失败',
+    'cursor.auth_expired': 'Cursor 登录态已失效，请在 Cursor 中重新登录',
+    'cursor.auth_task_failed': '读取 Cursor 登录态的任务失败',
+    'grok.net_failed': '网络请求失败',
+    'grok.parse_failed': '解析响应失败',
+    'devin.auth_expired': 'Devin 登录态已失效，请重新登录 Devin Desktop',
+    'devin.credential_task_failed': '读取 Devin 凭据的任务失败',
+    'devin.request_failed': '网络请求失败',
+    'devin.http_status': 'Devin 接口返回异常状态',
+    'devin.body_read_failed': '读取 Devin 响应失败',
+  },
+  en: {
+    'cred.sqlite_open': 'cannot open the local SQLite credential db read-only',
+    'cred.sqlite_readonly_mode': 'cannot set the local db to read-only mode',
+    'cred.sqlite_query': 'query on the local credential table failed',
+    'cred.key_read': 'failed to read a local credential key',
+    'cred.decrypt_key_mismatch': 'decryption failed: encryption key mismatch',
+    'cred.devin_windsurf_parse': 'failed to parse the Devin session state',
+    'devin.no_session': 'no valid Devin session or credentials found',
+    'factory.credential_task_failed': 'the Factory credential task failed',
+    'factory.auth_expired': 'Factory session expired — sign in to droid again',
+    'cursor.no_token': 'no Cursor access token found — make sure you are signed in to Cursor',
+    'cursor.no_token_db': 'failed to read Cursor state.vscdb',
+    'cursor.net_failed': 'network request failed',
+    'cursor.json_parse_failed': 'failed to parse the JSON response',
+    'cursor.auth_expired': 'Cursor session expired — sign in to Cursor again',
+    'cursor.auth_task_failed': 'the Cursor session read task failed',
+    'grok.net_failed': 'network request failed',
+    'grok.parse_failed': 'failed to parse the response',
+    'devin.auth_expired': 'Devin session expired — sign in to Devin Desktop again',
+    'devin.credential_task_failed': 'the Devin credential task failed',
+    'devin.request_failed': 'network request failed',
+    'devin.http_status': 'Devin API returned an error status',
+    'devin.body_read_failed': 'failed to read the Devin response',
+  },
+};
+function localizeError(raw) {
+  if (!raw) return '';
+  const dict = ERROR_TEXT[LANG] || ERROR_TEXT.en;
+  for (const k of Object.keys(dict).sort((a, b) => b.length - a.length)) {
+    if (raw === k) return dict[k];
+    if (raw.startsWith(k + ': ')) return `${dict[k]} (${raw.slice(k.length + 2)})`;
+  }
+  return raw;
+}
+function readFailedText(raw) {
+  return [t('card.read_failed'), localizeError(raw)].filter(Boolean).join(': ');
+}
+
+const WINDOW_LABELS = { fiveHour: t('win.fiveHour'), weekly: t('win.weekly'), monthly: t('win.monthly') };
+
+// HTML 里先写中文占位，这里按 LANG 统一改写，免得标记和字典两边各写一份
+function applyStaticText() {
+  document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en';
+  document.title = t('app.title');
+  const headTitle = document.querySelector('header .title');
+  if (headTitle) headTitle.textContent = t('app.title');
+  pillEl.title = t('pill.title');
+  btnRefresh.title = t('btn.refresh');
+  btnCloseCard.title = t('btn.close');
+  const pillLoading = pillStats.querySelector('span');
+  if (pillLoading) pillLoading.textContent = t('loading.pill');
+  const boardLoading = content.querySelector('div');
+  if (boardLoading) boardLoading.textContent = t('loading.board');
+  refreshHint.textContent = t('footer.auto', 5);
+}
+applyStaticText();
 
 let cfg = { warnPercent: 70, dangerPercent: 90 };
 let lastResults = null;
@@ -510,20 +648,20 @@ function severity(used) {
 
 function humanDuration(sec) {
   if (sec === null || sec === undefined) return '-';
-  if (sec <= 0) return '已重置';
+  if (sec <= 0) return t('reset.done');
   const d = Math.floor(sec / 86400);
   const h = Math.floor((sec % 86400) / 3600);
   const m = Math.floor((sec % 3600) / 60);
-  if (d > 0) return `${d}天${h}h`;
-  if (h > 0) return `${h}h${m}m`;
-  return `${m}m`;
+  if (d > 0) return h > 0 ? t('dur.day_hour', d, h) : t('dur.day', d);
+  if (h > 0) return m > 0 ? t('dur.hour_min', h, m) : t('dur.hour', h);
+  return t('dur.min', m);
 }
 
 function resetText(atUnix) {
   if (!atUnix) return '';
   const left = atUnix - Math.floor(Date.now() / 1000);
-  if (left <= 0) return '已重置';
-  return `${humanDuration(left)}后重置`;
+  if (left <= 0) return t('reset.done');
+  return t('reset.in', humanDuration(left));
 }
 
 // 倒计时原地刷新：整页重渲染会让 backdrop-filter 重新取样背景，透明窗口上表现为闪烁
@@ -548,7 +686,7 @@ function createMetricCell(label, usedPercent, reset) {
     <div class="gauge-track">
       <div class="gauge-fill ${sev}" style="width:${pct}%"></div>
     </div>
-    <div class="metric-reset">${reset || '实时计费'}</div>
+    <div class="metric-reset">${reset || t('cell.realtime')}</div>
   `;
   return cell;
 }
@@ -556,28 +694,27 @@ function createMetricCell(label, usedPercent, reset) {
 function renderFactory(r) {
   const card = document.createElement('div');
   card.className = 'section-card';
-  if (!r || !r.ok) {
-    card.innerHTML = `
-      <div class="card-header">
-        <span class="card-title">Factory</span>
-        <span class="card-meta" style="color:var(--apple-red)">读取失败: ${r?.error || ''}</span>
-      </div>
-    `;
-    return card;
-  }
-
   card.innerHTML = `
     <div class="card-header">
       <span class="card-title">Factory</span>
-      <span class="card-meta">${r.orgId || ''}</span>
+      <span class="card-meta"></span>
     </div>
   `;
+  const meta = card.querySelector('.card-meta');
+
+  if (!r || !r.ok) {
+    // 错误文案可能夹带服务端返回的原始内容，一律用 textContent 写入
+    meta.style.color = 'var(--apple-red)';
+    meta.textContent = readFailedText(r?.error);
+    return card;
+  }
+  meta.textContent = r.orgId || '';
 
   if (r.windows?.standard) {
     const grid = document.createElement('div');
     grid.className = 'grid-3';
     for (const [key, w] of Object.entries(r.windows.standard)) {
-      const reset = w.secondsRemaining != null ? `${humanDuration(w.secondsRemaining)}后` : '';
+      const reset = w.secondsRemaining != null ? t('window.in', humanDuration(w.secondsRemaining)) : '';
       grid.appendChild(createMetricCell(WINDOW_LABELS[key] || key, w.usedPercent, reset));
     }
     card.appendChild(grid);
@@ -586,13 +723,13 @@ function renderFactory(r) {
   if (r.windows?.core && Object.keys(r.windows.core).length > 0) {
     const coreTitle = document.createElement('div');
     coreTitle.style.cssText = 'font-size:10.5px;color:var(--apple-secondary);margin:7px 0 4px;font-weight:500;';
-    coreTitle.textContent = '免费模型池 (Core)';
+    coreTitle.textContent = t('factory.core');
     card.appendChild(coreTitle);
 
     const gridCore = document.createElement('div');
     gridCore.className = 'grid-3';
     for (const [key, w] of Object.entries(r.windows.core)) {
-      const reset = w.secondsRemaining != null ? `${humanDuration(w.secondsRemaining)}后` : '';
+      const reset = w.secondsRemaining != null ? t('window.in', humanDuration(w.secondsRemaining)) : '';
       gridCore.appendChild(createMetricCell(WINDOW_LABELS[key] || key, w.usedPercent, reset));
     }
     card.appendChild(gridCore);
@@ -601,10 +738,11 @@ function renderFactory(r) {
   const cents = r.extraUsageBalanceCents ?? 0;
   const footerLine = document.createElement('div');
   footerLine.className = 'card-footer-line';
-  footerLine.innerHTML = `
-    <span>超额策略: ${r.overagePreference || '默认'}</span>
-    <span>预付余额: $${(cents / 100).toFixed(2)}</span>
-  `;
+  const policy = document.createElement('span');
+  policy.textContent = `${t('factory.overage')}: ${r.overagePreference || t('factory.default')}`;
+  const balance = document.createElement('span');
+  balance.textContent = `${t('factory.prepaid')}: $${(cents / 100).toFixed(2)}`;
+  footerLine.append(policy, balance);
   card.appendChild(footerLine);
 
   return card;
@@ -613,37 +751,40 @@ function renderFactory(r) {
 function renderDevin(r) {
   const card = document.createElement('div');
   card.className = 'section-card';
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="card-title">Devin</span>
+      <span class="card-meta"></span>
+    </div>
+  `;
+  const meta = card.querySelector('.card-meta');
+
   if (!r || !r.ok) {
-    card.innerHTML = `
-      <div class="card-header">
-        <span class="card-title">Devin</span>
-        <span class="card-meta" style="color:var(--apple-red)">读取失败: ${r?.error || ''}</span>
-      </div>
-    `;
+    meta.style.color = 'var(--apple-red)';
+    meta.textContent = readFailedText(r?.error);
     return card;
   }
 
-  const badge = r.stale ? '<span class="apple-badge stale">本地缓存</span>' : '';
-  const meta = [r.planName, r.email].filter(Boolean).join(' · ');
-  card.innerHTML = `
-    <div class="card-header">
-      <span class="card-title">Devin</span>${badge}
-      <span class="card-meta">${meta}</span>
-    </div>
-  `;
+  if (r.stale) {
+    const badge = document.createElement('span');
+    badge.className = 'apple-badge stale';
+    badge.textContent = t('devin.stale');
+    meta.before(badge);
+  }
+  meta.textContent = [r.planName, r.email].filter(Boolean).join(' · ');
 
   const grid = document.createElement('div');
   grid.className = 'grid-2';
 
   if (typeof r.dailyRemainingPercent === 'number') {
     const used = 100 - r.dailyRemainingPercent;
-    const cellEl = createMetricCell('今日已用', used, resetText(r.dailyResetAtUnix));
+    const cellEl = createMetricCell(t('devin.daily'), used, resetText(r.dailyResetAtUnix));
     if (r.dailyResetAtUnix) bindReset(cellEl, r.dailyResetAtUnix);
     grid.appendChild(cellEl);
   }
   if (typeof r.weeklyRemainingPercent === 'number') {
     const used = 100 - r.weeklyRemainingPercent;
-    const cellEl = createMetricCell('本周已用', used, resetText(r.weeklyResetAtUnix));
+    const cellEl = createMetricCell(t('devin.weekly'), used, resetText(r.weeklyResetAtUnix));
     if (r.weeklyResetAtUnix) bindReset(cellEl, r.weeklyResetAtUnix);
     grid.appendChild(cellEl);
   }
@@ -651,16 +792,16 @@ function renderDevin(r) {
 
   const footerLine = document.createElement('div');
   footerLine.className = 'card-footer-line';
-  let acu = '';
+  const acuEl = document.createElement('span');
   if (typeof r.acuConsumed === 'number' && typeof r.acuLimit === 'number' && r.acuLimit > 0) {
-    acu = `ACU: ${r.acuConsumed} / ${r.acuLimit}`;
+    acuEl.textContent = `ACU: ${r.acuConsumed} / ${r.acuLimit}`;
   }
-  let renew = '';
+  const renewEl = document.createElement('span');
   if (r.planEndUnix) {
     const left = r.planEndUnix - Math.floor(Date.now() / 1000);
-    if (left > 0) renew = `续费: ${humanDuration(left)}后`;
+    if (left > 0) renewEl.textContent = t('devin.renew', humanDuration(left));
   }
-  footerLine.innerHTML = `<span>${acu}</span><span>${renew}</span>`;
+  footerLine.append(acuEl, renewEl);
   card.appendChild(footerLine);
 
   return card;
@@ -677,7 +818,7 @@ function renderCursor(r) {
       </div>
     `;
     // 错误文案里可能夹带服务端返回的原始 body，用 textContent 写入而不是 innerHTML
-    card.querySelector('.card-meta').textContent = `读取失败: ${r?.error || r?.grokError || '未知错误'}`;
+    card.querySelector('.card-meta').textContent = readFailedText(r?.error || r?.grokError || t('unknown'));
     return card;
   }
 
@@ -699,14 +840,18 @@ function renderCursor(r) {
     el.className = 'metric-cell';
     el.innerHTML = `
       <div class="metric-top">
-        <span class="metric-label">${label}</span>
-        <span class="metric-pct ${sev}">${has ? `${Math.min(100, Math.max(0, Math.round(pct)))}%` : '无数据'}</span>
+        <span class="metric-label"></span>
+        <span class="metric-pct ${sev}"></span>
       </div>
       <div class="gauge-track">
         <div class="gauge-fill ${sev}" style="width:${has ? Math.min(100, Math.max(2, pct)) : 0}%"></div>
       </div>
-      <div class="metric-reset">${sub}</div>
+      <div class="metric-reset"></div>
     `;
+    el.querySelector('.metric-label').textContent = label;
+    el.querySelector('.metric-pct').textContent =
+      has ? `${Math.min(100, Math.max(0, Math.round(pct)))}%` : t('cell.no_data');
+    el.querySelector('.metric-reset').textContent = sub;
     return el;
   };
 
@@ -722,8 +867,8 @@ function renderCursor(r) {
   const cycleReset = r.cycleResetUnix
     ? resetText(r.cycleResetUnix)
     : r.cycleEnd
-      ? `至 ${r.cycleEnd.slice(5, 10)}`
-      : '月周期';
+      ? t('cursor.until', r.cycleEnd.slice(5, 10))
+      : t('cursor.monthly');
   const autoCell = cell('Auto', autoPct, cycleReset);
   if (r.cycleResetUnix) bindReset(autoCell, r.cycleResetUnix);
   grid.appendChild(autoCell);
@@ -731,19 +876,19 @@ function renderCursor(r) {
   // 2. API 额度池
   const apiPct = typeof r.apiPercentUsed === 'number' ? r.apiPercentUsed : null;
   grid.appendChild(cell('API', apiPct,
-    apiPct === null ? '按量计费' : `剩余 ${Math.max(0, Math.round(100 - apiPct))}%`));
+    apiPct === null ? t('cursor.metered') : t('cursor.remaining', Math.max(0, Math.round(100 - apiPct)))));
 
   // 3. Grok Bot 的周额度。Grok Bot 是 Cursor 的产品，走的是同一个 Cursor 登录态。
   //    服务端说没额度可用时直接判红，不然百分比还没到阈值却显示绿色会误导
   const grokPct = typeof r.grokPercentUsed === 'number' ? r.grokPercentUsed : null;
   const grokExhausted = r.grokHasAvailableUsage === false;
   const grokSub = grokExhausted
-    ? '额度已耗尽'
+    ? t('grok.exhausted')
     : r.grokResetUnix
       ? resetText(r.grokResetUnix)
       : r.grokError
-        ? 'Grok 读取失败'
-        : '周周期';
+        ? t('grok.read_failed')
+        : t('grok.weekly');
   const grokCell = cell('Grok Bot', grokPct, grokSub, grokExhausted ? 'danger' : null);
   if (!grokExhausted && r.grokResetUnix) bindReset(grokCell, r.grokResetUnix);
   grid.appendChild(grokCell);
@@ -752,11 +897,16 @@ function renderCursor(r) {
 
   const footerLine = document.createElement('div');
   footerLine.className = 'card-footer-line';
-  const totalMsg = typeof r.totalPercentUsed === 'number' ? `综合用量: ${Math.round(r.totalPercentUsed)}%` : '';
+  const totalEl = document.createElement('span');
+  if (typeof r.totalPercentUsed === 'number') {
+    totalEl.textContent = `${t('total.prefix')}${Math.round(r.totalPercentUsed)}%`;
+  }
   // Cursor 侧失败但 Grok 侧成功时也要露出失败，否则看不出上面为什么是「无数据」
-  const resetMsg = r.error ? 'Cursor 额度读取失败' : r.cycleResetUnix ? `重置: ${resetText(r.cycleResetUnix)}` : '';
-  footerLine.innerHTML = `<span>${totalMsg}</span><span>${resetMsg}</span>`;
-  if (!r.error && r.cycleResetUnix) bindReset(footerLine.lastElementChild, r.cycleResetUnix, '重置: ');
+  const resetEl = document.createElement('span');
+  if (r.error) resetEl.textContent = t('cursor.footer_failed');
+  else if (r.cycleResetUnix) resetEl.textContent = resetText(r.cycleResetUnix);
+  footerLine.append(totalEl, resetEl);
+  if (!r.error && r.cycleResetUnix) bindReset(resetEl, r.cycleResetUnix);
   card.appendChild(footerLine);
 
   return card;
@@ -805,7 +955,7 @@ function renderPill(results) {
   }
 
   if (!chips.length) {
-    pillStats.innerHTML = '<span style="color:var(--apple-tertiary)">暂无数据</span>';
+    pillStats.innerHTML = `<span style="color:var(--apple-tertiary)">${t('empty')}</span>`;
     return;
   }
 
@@ -854,7 +1004,7 @@ function render(payload) {
   content.textContent = '';
 
   if (!results) {
-    content.innerHTML = '<div style="text-align:center;padding:24px;color:var(--apple-secondary)">暂无数据</div>';
+    content.innerHTML = `<div style="text-align:center;padding:24px;color:var(--apple-secondary)">${t('empty')}</div>`;
     renderPill(null);
     return;
   }
@@ -868,7 +1018,7 @@ function render(payload) {
   dotHead.className = 'dot ' + worst;
   renderPill(results);
 
-  if (at) updatedEl.textContent = `更新于 ${new Date(at).toLocaleTimeString()}`;
+  if (at) updatedEl.textContent = t('footer.updated', new Date(at).toLocaleTimeString());
 }
 
 api.onRefreshStart(() => btnRefresh.classList.add('spinning'));
@@ -896,9 +1046,10 @@ function reportSize() {
 setInterval(() => { for (const tick of tickers) tick(); }, 30000);
 
 (async () => {
+  api.setLocale(LANG);
   const c = await api.getConfig();
   cfg = { ...cfg, ...c };
-  refreshHint.textContent = `${c.refreshMinutes || 5}m 自动更新`;
+  refreshHint.textContent = t('footer.auto', c.refreshMinutes || 5);
   reportSize();
   const q = await api.getQuota();
   if (q) render(q);

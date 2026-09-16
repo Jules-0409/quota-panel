@@ -60,7 +60,7 @@ pub async fn fetch_factory(client: &reqwest::Client) -> FactoryQuota {
                 ok: false,
                 id: "factory".into(),
                 name: "Factory (Droid)".into(),
-                error: Some(format!("读取 Factory 凭据的任务失败: {}", join_err)),
+                error: Some(format!("factory.credential_task_failed: {}", join_err)),
                 fetched_at: now_millis(),
                 ..Default::default()
             };
@@ -98,7 +98,7 @@ pub async fn fetch_factory(client: &reqwest::Client) -> FactoryQuota {
             id: "factory".into(),
             name: "Factory (Droid)".into(),
             org_id: auth.active_organization_id,
-            error: Some("Factory 登录态已失效，请重新登录 droid".into()),
+            error: Some("factory.auth_expired".into()),
             fetched_at: now_millis(),
             ..Default::default()
         };

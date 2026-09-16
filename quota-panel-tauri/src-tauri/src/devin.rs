@@ -219,20 +219,20 @@ pub async fn fetch_devin_live(
     })
     .await;
 
-    let resp = send_result.map_err(|e| format!("Devin request failed: {}", e))?;
+    let resp = send_result.map_err(|e| format!("devin.request_failed: {}", e))?;
 
     let status = resp.status();
     if status.as_u16() == 401 || status.as_u16() == 403 {
-        return Err("Devin 登录态已失效，请重新登录 Devin Desktop".into());
+        return Err("devin.auth_expired".into());
     }
     if !status.is_success() {
-        return Err(format!("Devin API returned status {}", status));
+        return Err(format!("devin.http_status: {}", status));
     }
 
     let bytes = resp
         .bytes()
         .await
-        .map_err(|e| format!("Failed to read Devin response body: {}", e))?;
+        .map_err(|e| format!("devin.body_read_failed: {}", e))?;
 
     let top = parse_proto(&bytes);
     let user_status_bytes = get_sub(&top, 1).unwrap_or_default();
@@ -307,7 +307,7 @@ pub async fn fetch_devin(client: &reqwest::Client) -> DevinQuota {
                 ok: false,
                 id: "devin".into(),
                 name: "Devin".into(),
-                error: Some(format!("读取 Devin 凭据的任务失败: {}", join_err)),
+                error: Some(format!("devin.credential_task_failed: {}", join_err)),
                 fetched_at: now_millis(),
                 ..Default::default()
             };
