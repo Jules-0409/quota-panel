@@ -1,5 +1,7 @@
 # Quota Panel
 
+**中文** | [English](README.en.md)
+
 macOS / Windows 桌面上的常驻额度监控小组件。屏幕顶部一个「灵动岛」样式的胶囊，
 点开是一张卡片，同时显示 **Factory (Droid)、Devin、Cursor（含 Grok Bot）** 三个数据源的实时额度。
 
@@ -17,6 +19,13 @@ Rust + Tauri v2 实现，界面是一个零依赖的单文件 HTML，没有 Elec
 
 关于 Grok Bot：它是 **Cursor 的产品**，周额度由 Cursor 的服务端接口（`GetSandUsageStatus`）
 提供，吃的也是 Cursor 的登录态，所以它的额度合并显示在 Cursor 卡片里，而不是单独一张卡。
+
+关于 Devin 一栏：每轮刷新都**直接调 Cognition 的 seat-management 接口**
+（`server.codeium.com` 上的 protobuf over Connect-RPC），**没有本地缓存兜底**——
+调用失败就如实显示错误，不会拿旧数字冒充。自动每 5 分钟一轮，↻ / 托盘菜单可立即刷新；
+前提是这台机器上登录着 Devin Desktop 或 CLI（只读取其登录态）。该接口为逆向所得、非官方，
+厂商随时可能改动，所以这一栏的定位是**能用但尚不成熟**。详见
+[English](README.en.md) 的 "Devin: how the data gets here" 一节。
 
 顶部胶囊上只显示所有数据源里**最紧的那个百分比**，颜色按阈值变化
 （默认 70% 转黄、90% 转红，阈值在 `models.rs` 的 `AppConfig` 里）。
