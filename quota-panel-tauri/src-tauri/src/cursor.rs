@@ -96,6 +96,9 @@ fn find_cursor_cli_config_path() -> Option<PathBuf> {
 struct CursorAuth {
     token: String,
     user_id: String,
+    /// 网页会话 Cookie 的用户段。Cursor 现在用的是带 scope 的 auth id
+    /// （形如 `grok|user_01M…`），不再是 cli-config 里的数字 userId。
+    auth_id: String,
     email: Option<String>,
     membership_type: Option<String>,
     subscription_status: Option<String>,
@@ -104,6 +107,7 @@ struct CursorAuth {
 fn load_cursor_auth() -> Result<CursorAuth, String> {
     let mut token = String::new();
     let mut user_id = String::new();
+    let mut auth_id = String::new();
     let mut email = None;
     let mut membership_type = None;
     let mut subscription_status = None;
@@ -135,11 +139,14 @@ fn load_cursor_auth() -> Result<CursorAuth, String> {
     let mut db_error: Option<String> = None;
 
     if let Some(db_path) = find_cursor_vscdb_path() {
-        const CURSOR_KEYS: [&str; 4] = [
+        const CURSOR_KEYS: [&str; 7] = [
             "cursorAuth/accessToken",
             "cursorAuth/cachedEmail",
             "cursorAuth/stripeMembershipType",
             "cursorAuth/stripeSubscriptionStatus",
+            "glass.lastSignedInAuthId",
+            "cursorAuth/stripeMembershipAuthId",
+            "adminSettings.cachedAuthId",
         ];
 
         match crate::credentials::read_vscdb_items(&db_path, &CURSOR_KEYS) {
@@ -154,6 +161,10 @@ fn load_cursor_auth() -> Result<CursorAuth, String> {
                 }
                 membership_type = parsed.get("cursorAuth/stripeMembershipType").cloned();
                 subscription_status = parsed.get("cursorAuth/stripeSubscriptionStatus").cloned();
+                auth_id = ["glass.lastSignedInAuthId", "cursorAuth/stripeMembershipAuthId", "adminSettings.cachedAuthId"]
+                    .iter()
+                    .find_map(|k| parsed.get(*k).filter(|v| !v.is_empty()).cloned())
+                    .unwrap_or_default();
             }
             Err(e) => db_error = Some(e),
         }
@@ -185,6 +196,7 @@ fn load_cursor_auth() -> Result<CursorAuth, String> {
     Ok(CursorAuth {
         token,
         user_id,
+        auth_id,
         email,
         membership_type,
         subscription_status,
@@ -234,10 +246,16 @@ async fn fetch_usage_summary(
             .get("https://cursor.com/api/usage-summary")
             .header("Authorization", format!("Bearer {}", auth.token))
             .timeout(std::time::Duration::from_secs(8));
-        if !auth.user_id.is_empty() {
+        // Cookie 的用户段是带 scope 的 auth id；老版本 Cursor 本地只有数字 userId，退回用它
+        let cookie_user = if !auth.auth_id.is_empty() {
+            auth.auth_id.as_str()
+        } else {
+            auth.user_id.as_str()
+        };
+        if !cookie_user.is_empty() {
             req = req.header(
                 "Cookie",
-                format!("WorkosCursorSessionToken={}%3A%3A{}", auth.user_id, auth.token),
+                format!("WorkosCursorSessionToken={}%3A%3A{}", cookie_user, auth.token),
             );
         }
         req
@@ -247,6 +265,9 @@ async fn fetch_usage_summary(
 
     if !resp.status().is_success() {
         let status = resp.status();
+        if status.as_u16() == 401 || status.as_u16() == 403 {
+            return Err("cursor.auth_expired".into());
+        }
         let body = resp.text().await.unwrap_or_default();
         return Err(format!("HTTP {status}: {body}"));
     }
