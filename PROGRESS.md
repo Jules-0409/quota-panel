@@ -9,15 +9,15 @@
 
 ## 当前状态
 
-**可用，已推送到远端。** 三个数据源（Factory / Devin / Cursor 含 Grok Bot）在本机实测
+**可用。** 三个数据源（Factory / Devin / Cursor 含 Grok Bot）在本机实测
 都能取到数，`quota` CLI 和 GUI 共用同一套 fetcher。
 
-- 工作树干净，`main` 与 `origin/main` 同步于 `ede50ba`。
+- 工作树干净。
 - 2026-09-17 推送的那批提交修掉了下面记录的 3 个 bug、补上了测试和 CI。
   **`c424ac5` 及更早的版本没有这些修复。**
 - 推送经过当次明确授权；以后每次推送仍要重新获得授权。
 
-上一次实跑验证（2026-09-17，Windows 这台机器，真实登录态）：
+上一次实跑验证（2026-09-17，Windows + 真实登录态）：
 
 - `cargo test --bins --lib` → **52 passed, 0 failed**
 - `cargo clippy --all-targets -- -D warnings` → **通过，无 warning**
@@ -45,6 +45,17 @@ ede50ba Guard the Command import for non-unix platforms, and bump checkout to v5
 33e2f38 Document the test suite in both READMEs
 5bdbd7b Fix the ISO date and GCM IV parsing bugs, and add unit tests
 ```
+
+之后又追加了三个提交（**尚未推送**）：
+
+```
+2a5d7a8 Apply rustfmt and enforce it in CI
+b2a468f Make the docs machine-agnostic
+90f8f3e Add a README screenshot, and remove internal-only references from the docs
+```
+
+这三个涉及对外可读性：删掉了文档里只对作者本机有意义的绝对路径和内网说明，
+补了一张假数据截图，并把格式化与格式检查补齐。
 
 本轮之前的：
 
@@ -115,10 +126,12 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
   成了 unused import（它只被 macOS / Windows 两条凭据分支用到，两边都被 cfg 掉了），
   已在 `ede50ba` 里加 `#[cfg(any(target_os = "macos", target_os = "windows"))]` 修好，
   并在本机用「把两个平台的 cfg 改成恒假」的办法复现过。
-- ⚠️ **`cargo fmt --check` 没启用**：仓库从第一版起就没跑过 rustfmt，
-  当前有 36 处格式差异、涉及 8 个文件（含本轮没改过的 `commands.rs` / `factory.rs`）。
-  直接启用会让 CI 一上来就全红，淹没真正的失败。要么先单独格式化一次再启用，
-  要么就不启用。
+- ✅ **`cargo fmt --check` 已启用**：整棵树在 `2a5d7a8` 里跑过一次 `cargo fmt`，
+  同时该提交把 `cargo fmt --check` 加进了 CI 的 lint job（第一步），
+  并给 toolchain 装上 `rustfmt` 组件。本机 `cargo fmt --check` 现在通过。
+  格式化是纯格式改动，已逐文件核对过：去掉空白和 rustfmt 尾逗号后，
+  8 个文件里 6 个完全一致，`credentials.rs` 只有 4 处 import 顺序调整
+  （rustfmt 重排 `use`），没有逻辑改动。
 - **没有 `tests/` 集成测试目录**：所有测试都是 `#[cfg(test)] mod tests` 内联单元测试。
   涉及的纯函数够用，但跨模块的取数流程没有端到端测试（依赖真登录态，CI 上也难做）。
 
@@ -130,8 +143,6 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 3. **macOS 真机验证**：在真实 macOS 机器上构建并实跑，确认
    Keychain 分支、`.app` 打包、无边框窗口行为。
    （CI 已在 macOS runner 上编译并跑通测试，但那不等于真机上跑得起来。）
-4. **可选：启用 rustfmt**。跑一次 `cargo fmt`、单独提交格式化结果，再把
-   `cargo fmt --check` 加进 CI 的 lint job。
 
 ## 常用命令
 
@@ -139,6 +150,7 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 cd quota-panel-tauri/src-tauri
 cargo test --bins --lib
 cargo clippy --all-targets -- -D warnings
+cargo fmt --check
 cargo build --release --bin quota
 ./target/release/quota              # 三个数据源（Windows 上是 quota.exe）
 QUOTA_LANG=en ./target/release/quota --json
