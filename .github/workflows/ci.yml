@@ -29,7 +29,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      # v5 用 Node 24；v4 还是 Node 20，GitHub 会报 deprecation 警告
+      - uses: actions/checkout@v5
 
       # tauri 在 Linux 上编译需要 WebKitGTK 等系统库，这些在 macOS / Windows 上由系统自带
       - name: Install Linux system dependencies
@@ -60,7 +61,8 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # v5 用 Node 24；v4 还是 Node 20，GitHub 会报 deprecation 警告
+      - uses: actions/checkout@v5
 
       - name: Install Linux system dependencies
         run: |

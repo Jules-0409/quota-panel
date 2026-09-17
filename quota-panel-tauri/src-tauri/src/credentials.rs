@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+// 只被 macOS 的 `security` 和 Windows 的凭据管理器两条路径用到。
+// Linux 上两个函数都被 cfg 掉，不加这道 cfg 就是 unused import，
+// clippy -D warnings 会直接失败（CI 上就是这么红过一次）。
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 use std::process::Command;
 use base64::prelude::*;
 use rusqlite::{Connection, OpenFlags};
