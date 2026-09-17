@@ -60,13 +60,34 @@ Rust + Tauri v2 实现，界面是一个零依赖的单文件 HTML，没有 Elec
 ```bash
 cd quota-panel-tauri/src-tauri
 
-cargo run                # 开发模式
-cargo build --release    # 发布构建，产物在 target/release/
+cargo run                        # 开发模式
+cargo build --release            # 发布构建，产物在 target/release/
+cargo build --release --bin quota  # 只编命令行版本
 ```
 
 macOS 上直接运行 `target/release/quota-panel-tauri` 即可；
 想要 `.app` / `.dmg` / `.msi` 安装包用 `cargo tauri build`（需先装
 [tauri-cli](https://tauri.app/start/prerequisites/)）。
+
+## 命令行版本
+
+除了桌面组件，同一个 crate 里还有一个 `quota` 命令行程序，和界面共用同一套取数逻辑，
+适合脚本、周报、SSH 里快速看一眼。**它必须单独编译**：Windows 上的主程序是 GUI 子系统、
+本身没有控制台，直接拿主程序跑是打印不出东西的。
+
+```bash
+cargo build --release --bin quota    # 产物 target/release/quota(.exe)
+
+./quota                  # 三个数据源
+./quota factory          # 只看 Factory
+./quota devin            # 只看 Devin
+./quota cursor           # 只看 Cursor（含 Grok Bot）
+./quota --json           # 机器可读输出
+./quota watch            # 每 60 秒刷新（Ctrl+C 退出）
+```
+
+环境变量：`QUOTA_LANG=en|zh` 指定输出语言（默认跟随系统），`NO_COLOR=1` 关闭颜色。
+退出码：全部数据源都取不到数时为 `1`，参数写错为 `2`，正常为 `0`。
 
 ## 怎么用
 
@@ -105,15 +126,17 @@ macOS 上直接运行 `target/release/quota-panel-tauri` 即可；
 ```
 quota-panel-tauri/
 ├── src-tauri/
-│   └── src/
-│       ├── lib.rs           # 应用入口、托盘、后台轮询、三路并发的调度
-│       ├── cursor.rs        # Cursor usage-summary + Grok Bot 的 GetSandUsageStatus
-│       ├── devin.rs         # Devin（protobuf over Connect-RPC）
-│       ├── factory.rs       # Factory / Droid
-│       ├── credentials.rs   # 各客户端本地凭据的只读取用（含 AES-GCM 解密）
-│       ├── http.rs          # 共享 client 的 UA 与有限次重试
-│       ├── commands.rs      # Tauri IPC 命令
-│       └── models.rs        # 前后端共用的数据结构
+│   ├── src/
+│   │   ├── lib.rs           # 应用入口、托盘、后台轮询、三路并发的调度
+│   │   ├── cursor.rs        # Cursor usage-summary + Grok Bot 的 GetSandUsageStatus
+│   │   ├── devin.rs         # Devin（protobuf over Connect-RPC）
+│   │   ├── factory.rs       # Factory / Droid
+│   │   ├── credentials.rs   # 各客户端本地凭据的只读取用（含 AES-GCM 解密）
+│   │   ├── http.rs          # 共享 client 的 UA 与有限次重试
+│   │   ├── commands.rs      # Tauri IPC 命令
+│   │   ├── models.rs        # 前后端共用的数据结构
+│   │   └── bin/quota.rs     # 命令行版本，与界面共用上面的 fetcher
+│   └── Cargo.toml           # [[bin]] quota 必须单独声明，见「命令行版本」
 └── ui/index.html            # 整个界面：单文件、零外部依赖
 ```
 

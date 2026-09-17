@@ -76,13 +76,35 @@ Requirements:
 ```bash
 cd quota-panel-tauri/src-tauri
 
-cargo run                # development mode
-cargo build --release    # release binary in target/release/
+cargo run                          # development mode
+cargo build --release              # release binary in target/release/
+cargo build --release --bin quota  # command-line binary only
 ```
 
 On macOS you can run `target/release/quota-panel-tauri` directly; for `.app` / `.dmg` / `.msi`
 bundles use `cargo tauri build` (requires
 [tauri-cli](https://tauri.app/start/prerequisites/)).
+
+## Command-line version
+
+The same crate also ships a `quota` CLI sharing all the fetchers with the GUI — handy for
+scripts, reports, or a quick look over SSH. **It must be built separately**: on Windows the main
+binary is a GUI-subsystem app with no console, so running it would print nothing.
+
+```bash
+cargo build --release --bin quota    # produces target/release/quota(.exe)
+
+./quota                  # all three sources
+./quota factory          # Factory only
+./quota devin            # Devin only
+./quota cursor           # Cursor only (includes Grok Bot)
+./quota --json           # machine-readable
+./quota watch            # refresh every 60s (Ctrl+C to quit)
+```
+
+Environment: `QUOTA_LANG=en|zh` picks the output language (default: follow the OS), `NO_COLOR=1`
+disables colour. Exit codes: `1` when every requested source failed, `2` for a bad argument,
+`0` otherwise.
 
 ## Usage
 
@@ -127,15 +149,17 @@ Please read this before using or redistributing.
 ```
 quota-panel-tauri/
 ├── src-tauri/
-│   └── src/
-│       ├── lib.rs           # app entry, tray, background polling, 3-way concurrent scheduling
-│       ├── cursor.rs        # Cursor usage-summary + Grok Bot GetSandUsageStatus
-│       ├── devin.rs         # Devin (protobuf over Connect-RPC)
-│       ├── factory.rs       # Factory / Droid
-│       ├── credentials.rs   # read-only local credential loading (incl. AES-GCM decryption)
-│       ├── http.rs          # shared client UA + bounded retries
-│       ├── commands.rs      # Tauri IPC commands
-│       └── models.rs        # data structures shared between backend and UI
+│   ├── src/
+│   │   ├── lib.rs           # app entry, tray, background polling, 3-way concurrent scheduling
+│   │   ├── cursor.rs        # Cursor usage-summary + Grok Bot GetSandUsageStatus
+│   │   ├── devin.rs         # Devin (protobuf over Connect-RPC)
+│   │   ├── factory.rs       # Factory / Droid
+│   │   ├── credentials.rs   # read-only local credential loading (incl. AES-GCM decryption)
+│   │   ├── http.rs          # shared client UA + bounded retries
+│   │   ├── commands.rs      # Tauri IPC commands
+│   │   ├── models.rs        # data structures shared between backend and UI
+│   │   └── bin/quota.rs     # command-line version sharing the fetchers above
+│   └── Cargo.toml           # the [[bin]] quota target is declared separately, see "Command-line version"
 └── ui/index.html            # the entire UI: single file, zero external dependencies
 ```
 

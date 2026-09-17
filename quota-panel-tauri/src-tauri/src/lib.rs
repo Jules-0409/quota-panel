@@ -75,6 +75,20 @@ pub(crate) async fn query_all_quotas(config: &AppConfig, client: &reqwest::Clien
     }
 }
 
+/// CLI（`src/bin/quota.rs`）的入口：查一遍三个数据源，返回和 GUI 完全相同的结果。
+///
+/// 自己建 client、自己起一个多线程 runtime，完全不碰 Tauri 的 `AppHandle` /
+/// `AppState`，所以命令行和 GUI 可以共用同一套 fetcher 而互不依赖。
+pub async fn query_for_cli() -> QuotaResults {
+    let client = reqwest::Client::builder()
+        .user_agent(crate::http::USER_AGENT)
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .unwrap_or_default();
+
+    query_all_quotas(&AppConfig::default(), &client).await.results
+}
+
 pub(crate) async fn do_refresh(app: &tauri::AppHandle, state: &AppState) -> Result<QuotaPayload, String> {
     let _ = app.emit("refresh-start", ());
     let cfg = {

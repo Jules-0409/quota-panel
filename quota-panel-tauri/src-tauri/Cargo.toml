@@ -10,6 +10,13 @@ edition = "2021"
 name = "quota_panel_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# 命令行版本，和 GUI 共用同一套 fetcher（quota_panel_lib::query_for_cli）。
+# 必须单独成 bin：Windows 上主程序是 GUI 子系统（windows_subsystem = "windows"），
+# 没有控制台，直接用它跑查额度是打印不出来的。
+[[bin]]
+name = "quota"
+path = "src/bin/quota.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
