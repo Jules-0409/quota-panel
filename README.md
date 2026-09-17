@@ -5,6 +5,11 @@
 macOS / Windows 桌面上的常驻额度监控小组件。屏幕顶部一个「灵动岛」样式的胶囊，
 点开是一张卡片，同时显示 **Factory (Droid)、Devin、Cursor（含 Grok Bot）** 三个数据源的实时额度。
 
+![Quota Panel 展开后的卡片](docs/evidence/panel-overview.png)
+
+> 截图里的账号、组织、额度都是**假数据**，由 `scripts/make-ui-preview.cjs` 生成，
+> 不涉及任何真实凭据。
+
 Rust + Tauri v2 实现，界面是一个零依赖的单文件 HTML，没有 Electron。
 
 ---

@@ -15,7 +15,7 @@
 - 工作树干净，`main` 与 `origin/main` 同步于 `ede50ba`。
 - 2026-09-17 推送的那批提交修掉了下面记录的 3 个 bug、补上了测试和 CI。
   **`c424ac5` 及更早的版本没有这些修复。**
-- 推送用的是当次明确授权（母版第二节）；以后每次推送仍要重新获得授权。
+- 推送经过当次明确授权；以后每次推送仍要重新获得授权。
 
 上一次实跑验证（2026-09-17，Windows 这台机器，真实登录态）：
 
@@ -28,7 +28,7 @@
 - `node scripts/check-ui.cjs` → 通过（并做过反向测试：往副本里注入
   文案缺失、字段拼错、死代码，脚本都能报出来）
 - 界面改动过眼睛：`scripts/make-ui-preview.cjs` 生成离线预览（假数据、不碰真凭据），
-  截图存在 `docs/evidence/ui-preview.png`，三张卡、警告/危险配色、
+  截图存在 `docs/evidence/panel-overview.png`，三张卡、警告/危险配色、
   「无数据」和「额度已耗尽」两个分支都正常
 - GitHub Actions 真跑过：四个 job 全绿（见下方「未验证 / 已知缺口」里的详情）
 
@@ -59,8 +59,7 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 
 ## 最近做完的（2026-09-17 这一轮）
 
-起因：给项目补工程规范（母版第五节「正式项目」档），顺手加测试，
-**结果测试抓到 3 个真 bug**。
+起因：给项目补工程规范，顺手加测试，**结果测试抓到 3 个真 bug**。
 
 ### 抓到的 bug（都有回归测试钉住）
 
@@ -104,9 +103,9 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
   `cursor.rs` 的 `security` 回退、`lib.rs` 的 macOS 私有 API 窗口行为
   **都没在本机验证**。跨平台改动要特别小心。
 - ⚠️ **`quota-panel-tauri` 主程序（GUI）本轮没重新实跑**，只跑了 CLI 和测试。
-  界面改的是「删掉 stale 徽章」，风险低，但按母版要求
-  「界面改动必须过眼睛」，**下次动 UI 前应先 `cargo run` 看一眼**。
-- ⚠️ **Devin 的 protobuf 字段号是猜的**（见 `AGENTS.md` 第五节）。
+  界面改的是「删掉 stale 徽章」，风险低，但透明窗口的问题靠日志发现不了，
+  **下次动 UI 前应先 `cargo run` 看一眼，或至少渲染一次 `scripts/make-ui-preview.cjs`**。
+- ⚠️ **Devin 的 protobuf 字段号是猜的**（见 `AGENTS.md` 的「改契约 / 接口时」一节）。
   现在能对上，厂商改协议就会静默读错值。
 - ⚠️ **Grok Bot 的分母未公开**，百分比只能看趋势（README 已如实写明）。
 - ⚠️ **配置没持久化**：刷新间隔和阈值还写死在代码里。
@@ -128,13 +127,11 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 1. **配置持久化**：刷新间隔 / 阈值写进配置文件 + 一个设置界面，
    解决 README「已知限制」第一条。
 2. **拆文件**：`credentials.rs`（677 行）和 `cursor.rs`（569 行）都超了 400 行 soft cap。
-3. **macOS 验证**：在 Mac mini（见母版第十节）上构建并实跑，确认
+3. **macOS 真机验证**：在真实 macOS 机器上构建并实跑，确认
    Keychain 分支、`.app` 打包、无边框窗口行为。
    （CI 已在 macOS runner 上编译并跑通测试，但那不等于真机上跑得起来。）
 4. **可选：启用 rustfmt**。跑一次 `cargo fmt`、单独提交格式化结果，再把
    `cargo fmt --check` 加进 CI 的 lint job。
-5. **清理**：`D:\code2\` 顶层曾散落 png / ps1 / zip，已按母版第七节归到
-   `D:\code2\backup\quota-panel-artifacts\`。
 
 ## 常用命令
 

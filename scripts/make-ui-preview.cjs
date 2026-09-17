@@ -101,11 +101,17 @@ html = html.replace(
 if (!/id="panel" data-mode="expanded"/.test(html)) {
   throw new Error('没能把预览改成展开态，index.html 里 panel 的写法变了？');
 }
-// 让透明窗口在浏览器里也有底色，方便看对比度
+// 真程序是透明无边框窗口，直接截这个页面会得到透明底，看不清对比度，
+// 也不好判断卡片实际占多大。预览页给一个不透明底色即可。
+// 注意**不要**在这里放开页面宽度：body 变宽会横向溢出，
+// 截全页时旁边会多出一份重复的卡片。
 html = html.replace(
   'html, body {',
   'html, body { background: #1b1b20 !important;'
 );
+// backdrop-filter 在透明页面上会让整页截图出现平铺重影，预览不需要它
+html = html.replace(/backdrop-filter:[^;]+;/g, '');
+html = html.replace(/-webkit-backdrop-filter:[^;]+;/g, '');
 
 const out = path.join(outDir, 'ui-preview.html');
 fs.writeFileSync(out, html, 'utf8');
