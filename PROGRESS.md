@@ -9,8 +9,12 @@
 
 ## 当前状态
 
-**可用，已开源发布。** 三个数据源（Factory / Devin / Cursor 含 Grok Bot）在本机实测
-都能取到数，`quota` CLI 和 GUI 共用同一套 fetcher。仓库和 `origin/main` 同步。
+**可用，本机已提交、尚未推送。** 三个数据源（Factory / Devin / Cursor 含 Grok Bot）在本机实测
+都能取到数，`quota` CLI 和 GUI 共用同一套 fetcher。
+
+- 工作树干净，`main` 比 `origin/main` **领先 3 个提交**（`5bdbd7b`、`33e2f38`、`20491f4`），
+  **还没 push**。远端 `origin/main` 仍是 `c424ac5`，那一版**没有下面的任何修复、也没有测试**。
+- 推送前需要一次当次明确授权（母版第二节）。
 
 上一次实跑验证（2026-09-17，Windows 这台机器，真实登录态）：
 
@@ -20,6 +24,27 @@
   `QUOTA_LANG=en` 与 `zh` 两种输出都验证过，无中英混排
 - Factory `cycle` 类解析交叉验证：用真实 `cycleEnd` 对 Node 的 `Date.parse`，
   逐秒一致
+- `node scripts/check-ui.cjs` → 通过（并做过反向测试：往副本里注入
+  文案缺失、字段拼错、死代码，脚本都能报出来）
+- 界面改动过眼睛：`scripts/make-ui-preview.cjs` 生成离线预览（假数据、不碰真凭据），
+  截图存在 `docs/evidence/ui-preview.png`，三张卡、警告/危险配色、
+  「无数据」和「额度已耗尽」两个分支都正常
+
+## 提交记录
+
+```
+20491f4 Add project instructions, progress log, and UI/test tooling
+33e2f38 Document the test suite in both READMEs
+5bdbd7b Fix the ISO date and GCM IV parsing bugs, and add unit tests
+c424ac5 Add a `quota` CLI sharing the GUI's fetchers
+1fe59f9 Key the Cursor session cookie off the scoped auth id
+2201bd0 Add an English UI that follows the system locale
+12eee29 Add English README with a dedicated Devin data-path section
+0ec90dd Stop periodic DOM rebuilds that flicker the transparent window
+26afc18 Initial open-source release of Quota Panel
+```
+
+前三个是本轮的，**还没 push**。
 
 ## 最近做完的（2026-09-17 这一轮）
 
