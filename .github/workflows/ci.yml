@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # 允许在 Actions 页面手动跑一次
+  workflow_dispatch:
+
+# 同一个分支上连着推多次时，取消掉还在跑的旧任务，省机器
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # 三个平台都跑一遍测试。这个项目里有大量按平台分支的代码
+  # （macOS 走 Keychain、Windows 走凭据管理器、两边的 state.vscdb 路径都不同），
+  # 只在 Linux 上跑会漏掉这些分支的编译错误。
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # 一个平台挂了也要看到其它平台的结果，方便判断是普遍问题还是平台特有问题
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      # tauri 在 Linux 上编译需要 WebKitGTK 等系统库，这些在 macOS / Windows 上由系统自带
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            build-essential
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # 缓存 target/ 和 registry，二次运行能快很多
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: quota-panel-tauri/src-tauri
+
+      - name: cargo test
+        working-directory: quota-panel-tauri/src-tauri
+        run: cargo test --lib --bins
+
+  # 只在 Linux 上跑一次即可：clippy 和界面检查都不依赖平台
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            build-essential
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: quota-panel-tauri/src-tauri
+          key: lint
+
+      # 把 warning 当错误，防止慢慢积攒
+      - name: cargo clippy
+        working-directory: quota-panel-tauri/src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      # 界面是单文件、没有构建步骤，写错文案 key 不会报错，
+      # 只会在界面上静默显示成 key 本身或空白，所以单独查一遍
+      - name: Check UI
+        run: node scripts/check-ui.cjs
+
+      # 这里刻意**没有** cargo fmt --check：这个仓库从第一版起就没跑过 rustfmt，
+      # 加上它会让所有既有文件立刻变红，等于用格式问题淹没真正的编译/测试失败。
+      # 想启用就先单独跑一次 cargo fmt、提交格式化结果，再加这一步。

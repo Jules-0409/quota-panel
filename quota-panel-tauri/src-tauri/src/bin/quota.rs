@@ -92,60 +92,46 @@ impl Ctx {
     /// 之前只有窗口名和错误文案分了语言，标题、单位、页脚还是写死的中文，
     /// 于是「英文模式」打出来的是中英混排。
     ///
-    /// 返回 `String` 而不是 `&'static str`：未知 key 要原样返回，
-    /// 而借用自入参的引用活不到 `'static`。
+    /// 写成表而不是 `match`：新增文案只加一行，和下面的 `error_text` 一致，
+    /// 也不会被 rustfmt 拆成一处一屏的多行 `if`。
     fn t(&self, key: &str) -> String {
-        let zh = self.zh;
-        match key {
-            "factory.standard" => {
-                if zh { "Standard 用量" } else { "Standard usage" }.to_string()
+        let table: &[(&str, &str, &str)] = &[
+            ("factory.standard", "Standard 用量", "Standard usage"),
+            ("factory.core", "Droid Core (免费模型池)", "Droid Core (free model pool)"),
+            ("factory.overage", "超额策略", "Overage policy"),
+            ("factory.prepaid", "预付余额", "Prepaid balance"),
+            ("devin.daily", "今日 已用", "Used today"),
+            ("devin.weekly", "本周 已用", "Used this week"),
+            ("devin.acu", "ACU", "ACU"),
+            ("devin.overage", "超额余额", "Overage balance"),
+            (
+                "devin.source",
+                "数据来自 Devin 服务端实时接口",
+                "Source: Devin's live seat-management API",
+            ),
+            ("devin.renew_in", "下次续费 还有", "Renews in"),
+            ("cursor.auto", "Auto 已用", "Auto used"),
+            ("cursor.api", "API  已用", "API used"),
+            ("cursor.requests", "请求", "Requests"),
+            ("cursor.total", "综合用量", "Combined"),
+            ("cursor.grok", "Grok Bot 周额度 已用", "Grok Bot weekly used"),
+            ("cursor.cycle", "账期", "Billing cycle"),
+            ("cursor.none", "没有取到任何数据", "No data available"),
+            ("dur.reset", "已重置", "reset"),
+            ("dur.reset_passed", "重置点已过", "reset time passed"),
+            ("dur.resets_in", "重置于", "resets in"),
+        ];
+
+        match table.iter().find(|(k, _, _)| *k == key) {
+            Some((_, zh_text, en_text)) => {
+                if self.zh {
+                    (*zh_text).to_string()
+                } else {
+                    (*en_text).to_string()
+                }
             }
-            "factory.core" => if zh {
-                "Droid Core (免费模型池)"
-            } else {
-                "Droid Core (free model pool)"
-            }
-            .to_string(),
-            "devin.daily" => if zh { "今日 已用" } else { "Used today" }.to_string(),
-            "devin.weekly" => if zh { "本周 已用" } else { "Used this week" }.to_string(),
-            "devin.acu" => "ACU".to_string(),
-            "devin.overage" => if zh { "超额余额" } else { "Overage balance" }.to_string(),
-            "devin.source" => if zh {
-                "数据来自 Devin 服务端实时接口"
-            } else {
-                "Source: Devin's live seat-management API"
-            }
-            .to_string(),
-            "factory.overage" => if zh { "超额策略" } else { "Overage policy" }.to_string(),
-            "factory.prepaid" => if zh { "预付余额" } else { "Prepaid balance" }.to_string(),
-            "cursor.auto" => if zh { "Auto 已用" } else { "Auto used" }.to_string(),
-            "cursor.api" => if zh { "API  已用" } else { "API used" }.to_string(),
-            "cursor.requests" => if zh { "请求" } else { "Requests" }.to_string(),
-            "cursor.total" => if zh { "综合用量" } else { "Combined" }.to_string(),
-            "cursor.grok" => if zh {
-                "Grok Bot 周额度 已用"
-            } else {
-                "Grok Bot weekly used"
-            }
-            .to_string(),
-            "cursor.cycle" => if zh { "账期" } else { "Billing cycle" }.to_string(),
-            "cursor.none" => if zh {
-                "没有取到任何数据"
-            } else {
-                "No data available"
-            }
-            .to_string(),
-            "dur.reset" => if zh { "已重置" } else { "reset" }.to_string(),
-            "dur.reset_passed" => if zh {
-                "重置点已过"
-            } else {
-                "reset time passed"
-            }
-            .to_string(),
-            "dur.resets_in" => if zh { "重置于" } else { "resets in" }.to_string(),
-            "devin.renew_in" => if zh { "下次续费 还有" } else { "Renews in" }.to_string(),
             // 未知 key 原样返回，方便发现拼错的 key
-            _ => key.to_string(),
+            None => key.to_string(),
         }
     }
 

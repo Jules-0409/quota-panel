@@ -100,14 +100,20 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
   现在能对上，厂商改协议就会静默读错值。
 - ⚠️ **Grok Bot 的分母未公开**，百分比只能看趋势（README 已如实写明）。
 - ⚠️ **配置没持久化**：刷新间隔和阈值还写死在代码里。
-- 仓库**没有 CI**（无 `.github/`）。测试目前靠手动跑。
+- ⚠️ **CI 还没在 GitHub 上跑过第一次**：workflow 已提交，但推送后要实际看一眼
+  三个平台的 job 是否绿（尤其是 Linux 依赖和 macOS 分支的编译）。
+  **云端没跑绿之前，不要当成「CI 已经能用了」。**
+- ⚠️ **`cargo fmt --check` 没启用**：仓库从第一版起就没跑过 rustfmt，
+  当前有 36 处格式差异、涉及 8 个文件（含本轮没改过的 `commands.rs` / `factory.rs`）。
+  直接启用会让 CI 一上来就全红，淹没真正的失败。要么先单独格式化一次再启用，
+  要么就不启用。
 - **没有 `tests/` 集成测试目录**：所有测试都是 `#[cfg(test)] mod tests` 内联单元测试。
   涉及的纯函数够用，但跨模块的取数流程没有端到端测试（依赖真登录态，CI 上也难做）。
 
 ## 下一步（还没做，供接手者选）
 
-1. **加 CI**：GitHub Actions 跑 `cargo test` + `clippy -D warnings`。
-   不需要真凭据（测试全是纯函数），所以能直接上 GitHub 托管 runner。
+1. **看一眼 CI 首次结果**：推完到仓库 Actions 页面确认三个平台都绿。
+   若 Linux 依赖装不上或 macOS 编译不过，按报错调整 `.github/workflows/ci.yml`。
 2. **配置持久化**：刷新间隔 / 阈值写进配置文件 + 一个设置界面，
    解决 README「已知限制」第一条。
 3. **拆文件**：`credentials.rs`（677 行）和 `cursor.rs`（569 行）都超了 400 行 soft cap。
