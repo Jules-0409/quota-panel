@@ -12,9 +12,9 @@
 **可用，已推送到远端。** 三个数据源（Factory / Devin / Cursor 含 Grok Bot）在本机实测
 都能取到数，`quota` CLI 和 GUI 共用同一套 fetcher。
 
-- 工作树干净，`main` 与 `origin/main` 同步于 `1fe8c5d`。
-- 2026-09-17 推送的那 4 个提交（`5bdbd7b`、`33e2f38`、`20491f4`、`1fe8c5d`）
-  修掉了下面记录的 3 个 bug 并补上了测试。**`c424ac5` 及更早的版本没有这些修复。**
+- 工作树干净，`main` 与 `origin/main` 同步于 `ede50ba`。
+- 2026-09-17 推送的那批提交修掉了下面记录的 3 个 bug、补上了测试和 CI。
+  **`c424ac5` 及更早的版本没有这些修复。**
 - 推送用的是当次明确授权（母版第二节）；以后每次推送仍要重新获得授权。
 
 上一次实跑验证（2026-09-17，Windows 这台机器，真实登录态）：
@@ -30,13 +30,25 @@
 - 界面改动过眼睛：`scripts/make-ui-preview.cjs` 生成离线预览（假数据、不碰真凭据），
   截图存在 `docs/evidence/ui-preview.png`，三张卡、警告/危险配色、
   「无数据」和「额度已耗尽」两个分支都正常
+- GitHub Actions 真跑过：四个 job 全绿（见下方「未验证 / 已知缺口」里的详情）
 
 ## 提交记录
 
+本轮（2026-09-17）新增，全部已推到 `origin/main`：
+
 ```
+ede50ba Guard the Command import for non-unix platforms, and bump checkout to v5
+9411071 Add CI, and reshape the CLI string table to match error_text
+745e840 PROGRESS.md: mark the fixes as pushed to origin/main
+1fe8c5d Record the commit list and this round's verification in PROGRESS.md
 20491f4 Add project instructions, progress log, and UI/test tooling
 33e2f38 Document the test suite in both READMEs
 5bdbd7b Fix the ISO date and GCM IV parsing bugs, and add unit tests
+```
+
+本轮之前的：
+
+```
 c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 1fe59f9 Key the Cursor session cookie off the scoped auth id
 2201bd0 Add an English UI that follows the system locale
@@ -44,8 +56,6 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 0ec90dd Stop periodic DOM rebuilds that flicker the transparent window
 26afc18 Initial open-source release of Quota Panel
 ```
-
-前三个是本轮的，连同 `1fe8c5d` 已在 2026-09-17 推到 `origin/main`。
 
 ## 最近做完的（2026-09-17 这一轮）
 
@@ -100,9 +110,12 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
   现在能对上，厂商改协议就会静默读错值。
 - ⚠️ **Grok Bot 的分母未公开**，百分比只能看趋势（README 已如实写明）。
 - ⚠️ **配置没持久化**：刷新间隔和阈值还写死在代码里。
-- ⚠️ **CI 还没在 GitHub 上跑过第一次**：workflow 已提交，但推送后要实际看一眼
-  三个平台的 job 是否绿（尤其是 Linux 依赖和 macOS 分支的编译）。
-  **云端没跑绿之前，不要当成「CI 已经能用了」。**
+- ✅ **CI 已经在 GitHub 上跑绿了**（2026-09-17，commit `ede50ba`，run 35176866022）：
+  `lint` + `test` 三个平台（ubuntu / windows / macos）**四个 job 全绿**。
+  首次运行（`9411071`）lint 曾红过一次：Linux 上 `use std::process::Command`
+  成了 unused import（它只被 macOS / Windows 两条凭据分支用到，两边都被 cfg 掉了），
+  已在 `ede50ba` 里加 `#[cfg(any(target_os = "macos", target_os = "windows"))]` 修好，
+  并在本机用「把两个平台的 cfg 改成恒假」的办法复现过。
 - ⚠️ **`cargo fmt --check` 没启用**：仓库从第一版起就没跑过 rustfmt，
   当前有 36 处格式差异、涉及 8 个文件（含本轮没改过的 `commands.rs` / `factory.rs`）。
   直接启用会让 CI 一上来就全红，淹没真正的失败。要么先单独格式化一次再启用，
@@ -112,13 +125,14 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 
 ## 下一步（还没做，供接手者选）
 
-1. **看一眼 CI 首次结果**：推完到仓库 Actions 页面确认三个平台都绿。
-   若 Linux 依赖装不上或 macOS 编译不过，按报错调整 `.github/workflows/ci.yml`。
-2. **配置持久化**：刷新间隔 / 阈值写进配置文件 + 一个设置界面，
+1. **配置持久化**：刷新间隔 / 阈值写进配置文件 + 一个设置界面，
    解决 README「已知限制」第一条。
-3. **拆文件**：`credentials.rs`（677 行）和 `cursor.rs`（569 行）都超了 400 行 soft cap。
-4. **macOS 验证**：在 Mac mini（见母版第十节）上构建并实跑，确认
+2. **拆文件**：`credentials.rs`（677 行）和 `cursor.rs`（569 行）都超了 400 行 soft cap。
+3. **macOS 验证**：在 Mac mini（见母版第十节）上构建并实跑，确认
    Keychain 分支、`.app` 打包、无边框窗口行为。
+   （CI 已在 macOS runner 上编译并跑通测试，但那不等于真机上跑得起来。）
+4. **可选：启用 rustfmt**。跑一次 `cargo fmt`、单独提交格式化结果，再把
+   `cargo fmt --check` 加进 CI 的 lint job。
 5. **清理**：`D:\code2\` 顶层曾散落 png / ps1 / zip，已按母版第七节归到
    `D:\code2\backup\quota-panel-artifacts\`。
 
