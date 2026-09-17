@@ -9,12 +9,13 @@
 
 ## 当前状态
 
-**可用，本机已提交、尚未推送。** 三个数据源（Factory / Devin / Cursor 含 Grok Bot）在本机实测
+**可用，已推送到远端。** 三个数据源（Factory / Devin / Cursor 含 Grok Bot）在本机实测
 都能取到数，`quota` CLI 和 GUI 共用同一套 fetcher。
 
-- 工作树干净，`main` 比 `origin/main` **领先 3 个提交**（`5bdbd7b`、`33e2f38`、`20491f4`），
-  **还没 push**。远端 `origin/main` 仍是 `c424ac5`，那一版**没有下面的任何修复、也没有测试**。
-- 推送前需要一次当次明确授权（母版第二节）。
+- 工作树干净，`main` 与 `origin/main` 同步于 `1fe8c5d`。
+- 2026-09-17 推送的那 4 个提交（`5bdbd7b`、`33e2f38`、`20491f4`、`1fe8c5d`）
+  修掉了下面记录的 3 个 bug 并补上了测试。**`c424ac5` 及更早的版本没有这些修复。**
+- 推送用的是当次明确授权（母版第二节）；以后每次推送仍要重新获得授权。
 
 上一次实跑验证（2026-09-17，Windows 这台机器，真实登录态）：
 
@@ -44,7 +45,7 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 26afc18 Initial open-source release of Quota Panel
 ```
 
-前三个是本轮的，**还没 push**。
+前三个是本轮的，连同 `1fe8c5d` 已在 2026-09-17 推到 `origin/main`。
 
 ## 最近做完的（2026-09-17 这一轮）
 
