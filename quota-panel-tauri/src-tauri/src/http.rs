@@ -39,10 +39,7 @@ where
 
         match build_request().send().await {
             Ok(resp) => {
-                let status = resp.status();
-                let retryable =
-                    status.is_server_error() || status == reqwest::StatusCode::TOO_MANY_REQUESTS;
-                if !retryable || is_last {
+                if !is_retryable_status(resp.status()) || is_last {
                     return Ok(resp);
                 }
             }
@@ -56,5 +53,69 @@ where
 
         let delay_ms = BACKOFF_MS[(attempt - 1) as usize];
         tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+    }
+}
+
+/// 哪些 HTTP 状态码值得重试：服务端错误（5xx）和限流（429）。
+///
+/// 401/403 明确排除：登录态失效时重试只会白等 1.2 秒再把同样的错误报上去，
+/// 拖慢「请重新登录」这个真正有用的提示。
+fn is_retryable_status(status: reqwest::StatusCode) -> bool {
+    status.is_server_error() || status == reqwest::StatusCode::TOO_MANY_REQUESTS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use reqwest::StatusCode;
+
+    /// 5xx 与 429 才重试；明确列出边界，防止以后误把 429 从重试名单里删掉。
+    #[test]
+    fn retries_server_errors_and_rate_limit() {
+        for code in [500, 501, 502, 503, 504, 599, 429] {
+            let status = StatusCode::from_u16(code).unwrap();
+            assert!(is_retryable_status(status), "{code} 应当重试");
+        }
+    }
+
+    /// 401/403 不重试是有意为之：凭据失效重试没有意义。
+    #[test]
+    fn does_not_retry_auth_failures() {
+        for code in [401u16, 403] {
+            let status = StatusCode::from_u16(code).unwrap();
+            assert!(!is_retryable_status(status), "{code} 不应重试");
+        }
+    }
+
+    /// 其余 4xx 与全部 2xx/3xx 都不重试。
+    #[test]
+    fn does_not_retry_other_client_errors_or_success() {
+        for code in [200u16, 201, 204, 301, 302, 400, 404, 409, 422, 451] {
+            let status = StatusCode::from_u16(code).unwrap();
+            assert!(!is_retryable_status(status), "{code} 不应重试");
+        }
+    }
+
+    /// 重试次数和退避表要对得上：MAX_ATTEMPTS 是总尝试次数，
+    /// 所以退避表长度必须是 MAX_ATTEMPTS - 1，否则循环里会数组越界 panic。
+    #[test]
+    fn backoff_table_matches_max_attempts() {
+        assert_eq!(MAX_ATTEMPTS, 3);
+        assert_eq!(BACKOFF_MS.len() as u32, MAX_ATTEMPTS - 1);
+        // 指数退避：后一次等待必须比前一次长
+        assert!(BACKOFF_MS[1] > BACKOFF_MS[0]);
+    }
+
+    /// User-Agent 必须如实带版本号，不能伪造成厂商客户端。
+    #[test]
+    fn user_agent_reports_own_name() {
+        assert!(USER_AGENT.starts_with("quota-panel/"));
+        assert!(USER_AGENT.contains(env!("CARGO_PKG_VERSION")));
+        for spoofed in ["cursor", "devin", "codeium", "droid", "factory"] {
+            assert!(
+                !USER_AGENT.to_lowercase().contains(spoofed),
+                "UA 不应冒充 {spoofed}: {USER_AGENT}"
+            );
+        }
     }
 }

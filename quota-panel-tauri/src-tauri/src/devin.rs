@@ -278,8 +278,6 @@ pub async fn fetch_devin_live(
         plan_start_unix,
         plan_end_unix,
         source: Some(source.to_string()),
-        stale: false,
-        stale_reason: None,
         fetched_at: now_millis(),
         error: None,
     })
@@ -327,5 +325,181 @@ pub async fn fetch_devin(client: &reqwest::Client) -> DevinQuota {
             fetched_at: now_millis(),
             ..Default::default()
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// varint 的 7 位分组编码：多字节数必须正确往返。
+    /// 用 protobuf 规范里的自有例子（300 -> AC 02）当锚点。
+    #[test]
+    fn varint_roundtrips() {
+        for value in [0u64, 1, 127, 128, 300, 16383, 16384, u32::MAX as u64, u64::MAX] {
+            let encoded = encode_varint(value);
+            let (decoded, pos) = decode_varint(&encoded, 0).unwrap();
+            assert_eq!(decoded, value, "value: {value}");
+            assert_eq!(pos, encoded.len(), "value: {value}");
+        }
+    }
+
+    /// 编码出的字节要符合 protobuf 规范，不能只是「自己解自己」能对上。
+    /// 300 的 varint 是 0xAC 0x02，这是规范里的标准例子。
+    #[test]
+    fn varint_matches_protobuf_spec_bytes() {
+        assert_eq!(encode_varint(0), vec![0x00]);
+        assert_eq!(encode_varint(1), vec![0x01]);
+        assert_eq!(encode_varint(127), vec![0x7f]);
+        assert_eq!(encode_varint(128), vec![0x80, 0x01]);
+        assert_eq!(encode_varint(300), vec![0xac, 0x02]);
+    }
+
+    /// 截断的 varint（高位置 1 但没后续字节）必须返回 None 而不是死循环。
+    #[test]
+    fn truncated_varint_returns_none() {
+        assert_eq!(decode_varint(&[0x80], 0), None);
+        assert_eq!(decode_varint(&[0x80, 0x80], 0), None);
+        // 超过 64 位的连续高位也必须停下
+        let overlong = vec![0x80u8; 20];
+        assert_eq!(decode_varint(&overlong, 0), None);
+    }
+
+    /// 编码后的 tag 要能还原出字段号和 wire type。
+    #[test]
+    fn tag_encodes_field_and_wire_type() {
+        // field 1, wire 2 (length-delimited) -> 0x0A
+        assert_eq!(encode_tag(1, 2), vec![0x0a]);
+        // field 7, wire 2 -> 0x3A
+        assert_eq!(encode_tag(7, 2), vec![0x3a]);
+        // field 15, wire 0 -> 0x78
+        assert_eq!(encode_tag(15, 0), vec![0x78]);
+    }
+
+    /// 各种 wire type 的字段都要能解析出来，且 field 1 的
+    /// length-delimited 值原样保留。
+    #[test]
+    fn parses_mixed_wire_types() {
+        let mut body = Vec::new();
+        body.extend(encode_string(1, "hello"));
+        body.extend(encode_tag(2, 0));
+        body.extend(encode_varint(150));
+
+        let fields = parse_proto(&body);
+        assert_eq!(get_string(&fields, 1).unwrap(), "hello");
+        assert_eq!(get_varint(&fields, 2).unwrap(), 150);
+        assert_eq!(get_string(&fields, 2), None, "字段 2 是 varint，不该被当成串");
+    }
+
+    /// field number 0 是非法值，解析必须停住，不能无限循环。
+    #[test]
+    fn zero_field_number_stops_parsing() {
+        // tag = 0x00 -> field 0, wire 0
+        let fields = parse_proto(&[0x00, 0x01, 0x02]);
+        assert!(fields.is_empty());
+    }
+
+    /// 声明了长度但数据不够时必须停下，不能越界读。
+    /// 这是用手写解析器最容易出安全问题的地方：接口数据不可信。
+    #[test]
+    fn truncated_length_delimited_stops_parsing() {
+        // field 1, length 10, 但只跟了 2 字节
+        let fields = parse_proto(&[0x0a, 0x0a, 0x01, 0x02]);
+        assert!(fields.is_empty(), "不完整的字段不应被接受");
+    }
+
+    /// GetUserStatus 的嵌套结构：field 13 里的 plan_status 各字段要能被取到，
+    /// 且时间戳（field 2 / 3 是嵌套的 Timestamp{seconds}）要解出正确的秒数。
+    #[test]
+    fn parses_nested_plan_status() {
+        // plan_info{2: "Team"} 作为 plan_status.field1
+        let plan_info = encode_string(2, "Team");
+        // plan_status 各字段
+        let mut plan_status = Vec::new();
+        plan_status.extend(encode_message(1, &plan_info));
+        plan_status.extend(encode_tag(14, 0));
+        plan_status.extend(encode_varint(25)); // daily remaining 25%
+        plan_status.extend(encode_tag(15, 0));
+        plan_status.extend(encode_varint(60)); // weekly remaining 60%
+        plan_status.extend(encode_tag(16, 0));
+        plan_status.extend(encode_varint(1234)); // overage micros
+        plan_status.extend(encode_tag(17, 0));
+        plan_status.extend(encode_varint(1_700_000_000)); // daily reset
+        plan_status.extend(encode_tag(18, 0));
+        plan_status.extend(encode_varint(1_700_500_000)); // weekly reset
+        plan_status.extend(encode_tag(19, 0));
+        plan_status.extend(encode_varint(7)); // acu consumed
+        plan_status.extend(encode_tag(20, 0));
+        plan_status.extend(encode_varint(20)); // acu limit
+                                              // Timestamp{seconds: 1700000000} 放在 field 2 / 3
+        let mut ts_start = encode_tag(1, 0);
+        ts_start.extend(encode_varint(1_690_000_000));
+        plan_status.extend(encode_message(2, &ts_start));
+        let mut ts_end = encode_tag(1, 0);
+        ts_end.extend(encode_varint(1_720_000_000));
+        plan_status.extend(encode_message(3, &ts_end));
+
+        // 包一层 user_status{13: plan_status}，再包一层顶层{1: user_status}
+        let mut user_status = encode_string(7, "dev@example.com");
+        user_status.extend(encode_message(13, &plan_status));
+        let top = encode_message(1, &user_status);
+
+        let parsed_top = parse_proto(&top);
+        // get_sub 返回的是 owned Vec，parse_proto 借它，所以必须先绑成变量再解析
+        let user_bytes = get_sub(&parsed_top, 1).unwrap();
+        let user = parse_proto(&user_bytes);
+        assert_eq!(get_string(&user, 7).unwrap(), "dev@example.com");
+
+        let ps_bytes = get_sub(&user, 13).unwrap();
+        let ps = parse_proto(&ps_bytes);
+        let info_bytes = get_sub(&ps, 1).unwrap();
+        let info = parse_proto(&info_bytes);
+        assert_eq!(get_string(&info, 2).unwrap(), "Team");
+        assert_eq!(get_varint(&ps, 14).unwrap(), 25);
+        assert_eq!(get_varint(&ps, 15).unwrap(), 60);
+        assert_eq!(get_varint(&ps, 16).unwrap(), 1234);
+        assert_eq!(get_varint(&ps, 17).unwrap(), 1_700_000_000);
+        assert_eq!(get_varint(&ps, 18).unwrap(), 1_700_500_000);
+        assert_eq!(get_varint(&ps, 19).unwrap(), 7);
+        assert_eq!(get_varint(&ps, 20).unwrap(), 20);
+        assert_eq!(get_timestamp(&ps, 2).unwrap(), 1_690_000_000);
+        assert_eq!(get_timestamp(&ps, 3).unwrap(), 1_720_000_000);
+    }
+
+    /// 非 UTF-8 的 length-delimited 值当字符串取时必须返回 None，不能 panic。
+    #[test]
+    fn invalid_utf8_string_is_none() {
+        let mut body = encode_tag(1, 2);
+        body.extend(encode_varint(2));
+        body.extend_from_slice(&[0xff, 0xfe]);
+
+        let fields = parse_proto(&body);
+        assert_eq!(get_string(&fields, 1), None);
+        // 但底层字节还在，取 sub 拿得到
+        assert_eq!(get_sub(&fields, 1), Some(vec![0xff, 0xfe]));
+    }
+
+    /// 空响应（服务端返回 0 字节）不该 panic，只是什么都取不到。
+    /// 注意这里没有超时保护也应是 O(1)。
+    #[test]
+    fn empty_response_yields_no_fields() {
+        let fields = parse_proto(&[]);
+        assert!(fields.is_empty());
+        assert_eq!(get_varint(&fields, 14), None);
+        assert_eq!(get_string(&fields, 7), None);
+        assert_eq!(get_sub(&fields, 1), None);
+    }
+
+    /// 重复字段取第一个出现（`find_map` 语义），保证行为被测试锁住。
+    #[test]
+    fn duplicate_fields_use_first_occurrence() {
+        let mut body = Vec::new();
+        body.extend(encode_tag(14, 0));
+        body.extend(encode_varint(11));
+        body.extend(encode_tag(14, 0));
+        body.extend(encode_varint(22));
+
+        let fields = parse_proto(&body);
+        assert_eq!(get_varint(&fields, 14), Some(11));
     }
 }

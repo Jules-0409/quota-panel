@@ -88,6 +88,67 @@ impl Ctx {
         }
     }
 
+    /// 固定文案的对照表。`QUOTA_LANG=en` 现在真的会全部走英文——
+    /// 之前只有窗口名和错误文案分了语言，标题、单位、页脚还是写死的中文，
+    /// 于是「英文模式」打出来的是中英混排。
+    ///
+    /// 返回 `String` 而不是 `&'static str`：未知 key 要原样返回，
+    /// 而借用自入参的引用活不到 `'static`。
+    fn t(&self, key: &str) -> String {
+        let zh = self.zh;
+        match key {
+            "factory.standard" => {
+                if zh { "Standard 用量" } else { "Standard usage" }.to_string()
+            }
+            "factory.core" => if zh {
+                "Droid Core (免费模型池)"
+            } else {
+                "Droid Core (free model pool)"
+            }
+            .to_string(),
+            "devin.daily" => if zh { "今日 已用" } else { "Used today" }.to_string(),
+            "devin.weekly" => if zh { "本周 已用" } else { "Used this week" }.to_string(),
+            "devin.acu" => "ACU".to_string(),
+            "devin.overage" => if zh { "超额余额" } else { "Overage balance" }.to_string(),
+            "devin.source" => if zh {
+                "数据来自 Devin 服务端实时接口"
+            } else {
+                "Source: Devin's live seat-management API"
+            }
+            .to_string(),
+            "factory.overage" => if zh { "超额策略" } else { "Overage policy" }.to_string(),
+            "factory.prepaid" => if zh { "预付余额" } else { "Prepaid balance" }.to_string(),
+            "cursor.auto" => if zh { "Auto 已用" } else { "Auto used" }.to_string(),
+            "cursor.api" => if zh { "API  已用" } else { "API used" }.to_string(),
+            "cursor.requests" => if zh { "请求" } else { "Requests" }.to_string(),
+            "cursor.total" => if zh { "综合用量" } else { "Combined" }.to_string(),
+            "cursor.grok" => if zh {
+                "Grok Bot 周额度 已用"
+            } else {
+                "Grok Bot weekly used"
+            }
+            .to_string(),
+            "cursor.cycle" => if zh { "账期" } else { "Billing cycle" }.to_string(),
+            "cursor.none" => if zh {
+                "没有取到任何数据"
+            } else {
+                "No data available"
+            }
+            .to_string(),
+            "dur.reset" => if zh { "已重置" } else { "reset" }.to_string(),
+            "dur.reset_passed" => if zh {
+                "重置点已过"
+            } else {
+                "reset time passed"
+            }
+            .to_string(),
+            "dur.resets_in" => if zh { "重置于" } else { "resets in" }.to_string(),
+            "devin.renew_in" => if zh { "下次续费 还有" } else { "Renews in" }.to_string(),
+            // 未知 key 原样返回，方便发现拼错的 key
+            _ => key.to_string(),
+        }
+    }
+
     /// 后端发的是语言无关的 key（见 ui/index.html 的 ERROR_TEXT），这里翻译成人话
     fn error_text(&self, raw: &str) -> String {
         let zh = self.zh;
@@ -119,10 +180,10 @@ impl Ctx {
         // key 后面可能跟 `: 细节`，匹配最长的 key 前缀，细节原样附在后面
         let mut best: Option<(&str, &str)> = None;
         for (k, z, e) in table {
-            if raw == *k || raw.starts_with(&format!("{k}: ")) {
-                if best.map_or(true, |(bk, _)| k.len() > bk.len()) {
-                    best = Some((*k, if zh { *z } else { *e }));
-                }
+            if (raw == *k || raw.starts_with(&format!("{k}: ")))
+                && best.is_none_or(|(bk, _)| k.len() > bk.len())
+            {
+                best = Some((*k, if zh { *z } else { *e }));
             }
         }
         match best {
@@ -146,30 +207,42 @@ fn now_unix() -> i64 {
         .as_secs() as i64
 }
 
-/// 剩余秒数 → 人话
-fn human_duration(sec: i64) -> String {
+/// 剩余秒数 → 人话。语言由调用方的 `Ctx` 决定。
+fn human_duration(c: &Ctx, sec: i64) -> String {
+    let zh = c.zh;
     if sec <= 0 {
-        return "已重置".into();
+        return c.t("dur.reset").to_string();
     }
     let d = sec / 86400;
     let h = (sec % 86400) / 3600;
     let m = (sec % 3600) / 60;
-    if d > 0 {
-        format!("{d}天{h}小时")
+    if zh {
+        if d > 0 {
+            format!("{d}天{h}小时")
+        } else if h > 0 {
+            format!("{h}小时{m}分")
+        } else {
+            format!("{m}分")
+        }
+    } else if d > 0 {
+        format!("{d}d {h}h")
     } else if h > 0 {
-        format!("{h}小时{m}分")
+        format!("{h}h {m}m")
     } else {
-        format!("{m}分")
+        format!("{m}m")
     }
 }
 
 /// 重置时间点 → 还剩多久
-fn reset_hint(at_unix: i64) -> String {
+fn reset_hint(c: &Ctx, at_unix: i64) -> String {
     let left = at_unix - now_unix();
     if left <= 0 {
-        "重置点已过".into()
+        c.t("dur.reset_passed")
+    } else if c.zh {
+        // 中文习惯把「后」放在时长后面：重置于 3小时34分后
+        format!("{} {} 后", c.t("dur.resets_in"), human_duration(c, left))
     } else {
-        format!("重置于 {} 后", human_duration(left))
+        format!("{} {}", c.t("dur.resets_in"), human_duration(c, left))
     }
 }
 
@@ -207,18 +280,18 @@ fn print_factory(c: &Ctx, r: &FactoryQuota) {
     }
 
     let groups = [
-        ("Standard 用量", r.windows.standard.as_ref()),
-        ("Droid Core (免费模型池)", r.windows.core.as_ref()),
+        (c.t("factory.standard"), r.windows.standard.as_ref()),
+        (c.t("factory.core"), r.windows.core.as_ref()),
     ];
     for (label, group) in groups {
         let Some(group) = group else { continue };
-        println!("  {}", c.cyan(label));
+        println!("  {}", c.cyan(&label));
         for key in WINDOW_ORDER {
             let Some(w) = group.get(key) else { continue };
             let bar = text_bar(w.used_percent, 24);
             let reset = w
                 .seconds_remaining
-                .map(|s| c.dim(&format!("  {}", reset_hint(now_unix() + s))))
+                .map(|s| c.dim(&format!("  {}", reset_hint(c, now_unix() + s))))
                 .unwrap_or_default();
             println!(
                 "    {:<6} {}{}",
@@ -234,8 +307,10 @@ fn print_factory(c: &Ctx, r: &FactoryQuota) {
     println!(
         "  {}",
         c.dim(&format!(
-            "超额策略 {} · 预付余额 ${:.2}",
+            "{} {} · {} ${:.2}",
+            c.t("factory.overage"),
             policy,
+            c.t("factory.prepaid"),
             cents as f64 / 100.0
         ))
     );
@@ -265,10 +340,11 @@ fn print_devin(c: &Ctx, r: &DevinQuota) {
         let used = 100.0 - remaining;
         let reset = r
             .daily_reset_at_unix
-            .map(|t| c.dim(&format!("  {}", reset_hint(t))))
+            .map(|t| c.dim(&format!("  {}", reset_hint(c, t))))
             .unwrap_or_default();
         println!(
-            "    今日 已用 {}{}",
+            "    {} {}{}",
+            c.t("devin.daily"),
             c.paint(severity_code(used), &text_bar(used, 24)),
             reset
         );
@@ -277,10 +353,11 @@ fn print_devin(c: &Ctx, r: &DevinQuota) {
         let used = 100.0 - remaining;
         let reset = r
             .weekly_reset_at_unix
-            .map(|t| c.dim(&format!("  {}", reset_hint(t))))
+            .map(|t| c.dim(&format!("  {}", reset_hint(c, t))))
             .unwrap_or_default();
         println!(
-            "    本周 已用 {}{}",
+            "    {} {}{}",
+            c.t("devin.weekly"),
             c.paint(severity_code(used), &text_bar(used, 24)),
             reset
         );
@@ -289,7 +366,8 @@ fn print_devin(c: &Ctx, r: &DevinQuota) {
         if limit > 0 {
             let used = (consumed as f64 / limit as f64) * 100.0;
             println!(
-                "    ACU  {}  {} / {}",
+                "    {}  {}  {} / {}",
+                c.t("devin.acu"),
                 text_bar(used, 24),
                 consumed,
                 limit
@@ -298,7 +376,14 @@ fn print_devin(c: &Ctx, r: &DevinQuota) {
     }
     if let Some(micros) = r.overage_balance_micros {
         if micros > 0 {
-            println!("    {}", c.dim(&format!("超额余额 ${:.2}", micros as f64 / 1e6)));
+            println!(
+                "    {}",
+                c.dim(&format!(
+                    "{} ${:.2}",
+                    c.t("devin.overage"),
+                    micros as f64 / 1e6
+                ))
+            );
         }
     }
     if let Some(end) = r.plan_end_unix {
@@ -306,12 +391,19 @@ fn print_devin(c: &Ctx, r: &DevinQuota) {
         if left > 0 {
             println!(
                 "    {}",
-                c.dim(&format!("下次续费 还有 {}（unix {end}）", human_duration(left)))
+                c.dim(&format!(
+                    "{} {} (unix {end})",
+                    c.t("devin.renew_in"),
+                    human_duration(c, left)
+                ))
             );
         }
     }
     if let Some(src) = &r.source {
-        println!("  {}", c.dim(&format!("数据来自 Devin 服务端实时接口（{src}）")));
+        println!(
+            "  {}",
+            c.dim(&format!("{} ({src})", c.t("devin.source")))
+        );
     }
 }
 
@@ -338,13 +430,15 @@ fn print_cursor(c: &Ctx, r: &CursorQuota) {
         }
         if let Some(p) = r.auto_percent_used {
             println!(
-                "    Auto 已用 {}",
+                "    {} {}",
+                c.t("cursor.auto"),
                 c.paint(severity_code(p), &text_bar(p, 24))
             );
         }
         if let Some(p) = r.api_percent_used {
             println!(
-                "    API  已用 {}",
+                "    {} {}",
+                c.t("cursor.api"),
                 c.paint(severity_code(p), &text_bar(p, 24))
             );
         }
@@ -353,7 +447,8 @@ fn print_cursor(c: &Ctx, r: &CursorQuota) {
                 if limit > 0 {
                     let p = (used as f64 / limit as f64) * 100.0;
                     println!(
-                        "    请求 {}  {} / {}",
+                        "    {} {}  {} / {}",
+                        c.t("cursor.requests"),
                         c.paint(severity_code(p), &text_bar(p, 24)),
                         used,
                         limit
@@ -362,7 +457,10 @@ fn print_cursor(c: &Ctx, r: &CursorQuota) {
             }
         }
         if let Some(p) = r.total_percent_used {
-            println!("    {}", c.dim(&format!("综合用量 {:.1}%", p)));
+            println!(
+                "    {}",
+                c.dim(&format!("{} {:.1}%", c.t("cursor.total"), p))
+            );
         }
     }
 
@@ -370,17 +468,21 @@ fn print_cursor(c: &Ctx, r: &CursorQuota) {
         printed_any = true;
         let reset = r
             .grok_reset_unix
-            .map(|t| c.dim(&format!("  {}", reset_hint(t))))
+            .map(|t| c.dim(&format!("  {}", reset_hint(c, t))))
             .unwrap_or_default();
         println!(
-            "    Grok Bot 周额度 已用 {}{}",
+            "    {} {}{}",
+            c.t("cursor.grok"),
             c.paint(severity_code(p), &text_bar(p, 24)),
             reset
         );
     }
 
-    if let Some(t) = r.cycle_reset_unix {
-        println!("    {}", c.dim(&format!("账期 {}", reset_hint(t))));
+    if let Some(reset_at) = r.cycle_reset_unix {
+        println!(
+            "    {}",
+            c.dim(&format!("{} {}", c.t("cursor.cycle"), reset_hint(c, reset_at)))
+        );
     }
 
     if let Some(err) = &r.error {
@@ -391,7 +493,7 @@ fn print_cursor(c: &Ctx, r: &CursorQuota) {
     }
 
     if !printed_any && r.error.is_none() && r.grok_error.is_none() {
-        println!("  {}", c.dim("没有取到任何数据"));
+        println!("  {}", c.dim(&c.t("cursor.none")));
     }
 }
 
@@ -520,13 +622,12 @@ async fn main() {
             print!("\x1b[2J\x1b[H");
         }
         first = false;
-        println!(
-            "{}",
-            c.dim(&format!(
-                "刷新于 {} UTC  (Ctrl+C 退出)",
-                fmt_utc_time(now_unix())
-            ))
-        );
+        let header = if c.zh {
+            format!("刷新于 {} UTC  (Ctrl+C 退出)", fmt_utc_time(now_unix()))
+        } else {
+            format!("Refreshed at {} UTC  (Ctrl+C to quit)", fmt_utc_time(now_unix()))
+        };
+        println!("{}", c.dim(&header));
         let _ = once(&c, &targets, json).await;
         tokio::time::sleep(Duration::from_secs(60)).await;
     }
@@ -539,4 +640,227 @@ async fn main() {
 fn fmt_utc_time(unix: i64) -> String {
     let secs = unix.rem_euclid(86400);
     format!("{:02}:{:02}:{:02}", secs / 3600, (secs % 3600) / 60, secs % 60)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ctx(zh: bool) -> Ctx {
+        Ctx { tty: false, zh }
+    }
+
+    /// 进度条：填充块数量要和百分比对应，且总宽度固定。
+    #[test]
+    fn text_bar_fills_proportionally() {
+        assert_eq!(text_bar(0.0, 10), "░░░░░░░░░░   0%");
+        assert_eq!(text_bar(100.0, 10), "██████████ 100%");
+        assert_eq!(text_bar(50.0, 10), "█████░░░░░  50%");
+    }
+
+    /// 越界百分比必须被夹住，否则 `"█".repeat(filled)` 会 panic 或画出超长条。
+    #[test]
+    fn text_bar_clamps_out_of_range() {
+        // 负数与 >100 都不能 panic，长度也要保持在 width 以内
+        let neg = text_bar(-50.0, 10);
+        assert!(neg.contains("0%"), "got: {neg}");
+        let over = text_bar(500.0, 10);
+        assert!(over.contains("100%"), "got: {over}");
+        // 填充部分不能超过 width
+        assert_eq!(over.matches('█').count(), 10);
+        assert_eq!(text_bar(-50.0, 10).matches('█').count(), 0);
+    }
+
+    /// 四舍五入：49.6% 在 width=10 时应当填 5 格而不是 4 格。
+    #[test]
+    fn text_bar_rounds_half_up() {
+        assert_eq!(text_bar(49.6, 10).matches('█').count(), 5);
+        assert_eq!(text_bar(44.0, 10).matches('█').count(), 4);
+    }
+
+    /// 严重程度分档：阈值本身算「已达」，边界必须落在正确一侧。
+    #[test]
+    fn severity_thresholds_are_inclusive() {
+        assert_eq!(severity_code(0.0), "32"); // 绿
+        assert_eq!(severity_code(69.9), "32");
+        assert_eq!(severity_code(WARN_PERCENT), "33"); // 黄，阈值本身算黄
+        assert_eq!(severity_code(89.9), "33");
+        assert_eq!(severity_code(DANGER_PERCENT), "31"); // 红
+        assert_eq!(severity_code(100.0), "31");
+        assert_eq!(severity_code(1000.0), "31");
+    }
+
+    /// 人话时长：三种量级各测一次，中英都要有对应写法。
+    #[test]
+    fn human_duration_covers_all_magnitudes() {
+        assert_eq!(human_duration(&ctx(true), 0), "已重置");
+        assert_eq!(human_duration(&ctx(true), -10), "已重置");
+        assert_eq!(human_duration(&ctx(true), 90), "1分");
+        assert_eq!(human_duration(&ctx(true), 3700), "1小时1分");
+        assert_eq!(human_duration(&ctx(true), 90000), "1天1小时");
+
+        assert_eq!(human_duration(&ctx(false), 0), "reset");
+        assert_eq!(human_duration(&ctx(false), 90), "1m");
+        assert_eq!(human_duration(&ctx(false), 3700), "1h 1m");
+        assert_eq!(human_duration(&ctx(false), 90000), "1d 1h");
+    }
+
+    /// 英文模式不能再漏中文：这是回归测试。
+    /// 之前只有窗口名和错误文案分了语言，标题和单位是写死的中文。
+    #[test]
+    fn english_mode_has_no_chinese_leftovers() {
+        let keys = [
+            "factory.standard",
+            "factory.core",
+            "factory.overage",
+            "factory.prepaid",
+            "devin.daily",
+            "devin.weekly",
+            "devin.acu",
+            "devin.overage",
+            "devin.source",
+            "devin.renew_in",
+            "cursor.auto",
+            "cursor.api",
+            "cursor.requests",
+            "cursor.total",
+            "cursor.grok",
+            "cursor.cycle",
+            "cursor.none",
+            "dur.reset",
+            "dur.reset_passed",
+            "dur.resets_in",
+        ];
+        let c = ctx(false);
+        for key in keys {
+            let s = c.t(key);
+            assert!(
+                !s.chars().any(|ch| ('\u{4e00}'..='\u{9fff}').contains(&ch)),
+                "key {key} 在英文模式下仍是中文: {s}"
+            );
+            assert_ne!(s, key, "key {key} 没有对应文案");
+        }
+        // 时长和重置提示同理
+        for s in [
+            human_duration(&c, 3700),
+            human_duration(&c, 90000),
+            reset_hint(&c, now_unix() + 3600),
+        ] {
+            assert!(
+                !s.chars().any(|ch| ('\u{4e00}'..='\u{9fff}').contains(&ch)),
+                "英文模式下漏中文: {s}"
+            );
+        }
+    }
+
+    /// 中文模式反过来说应当有中文，避免两个分支被写成同一份。
+    #[test]
+    fn chinese_mode_actually_uses_chinese() {
+        let c = ctx(true);
+        assert_eq!(c.t("devin.daily"), "今日 已用");
+        assert!(human_duration(&c, 90000).contains('天'));
+        assert!(reset_hint(&c, now_unix() + 3600).contains("后"));
+    }
+
+    /// 未知 key 原样返回，方便暴露拼错的 key。
+    #[test]
+    fn unknown_label_key_returns_input() {
+        assert_eq!(ctx(true).t("no.such.key"), "no.such.key");
+    }
+
+    /// 窗口 key → 显示名：已知的三种要翻译，未知的不能丢。
+    #[test]
+    fn window_labels_translate_known_keys() {
+        assert_eq!(ctx(true).window_label("fiveHour"), "5 小时");
+        assert_eq!(ctx(true).window_label("weekly"), "7 天");
+        assert_eq!(ctx(true).window_label("monthly"), "30 天");
+        assert_eq!(ctx(false).window_label("fiveHour"), "5h");
+        // 接口以后新增窗口时原样显示，而不是丢掉
+        assert_eq!(ctx(true).window_label("yearly"), "yearly");
+    }
+
+    /// UTC 时间格式：必须是 HH:MM:SS，且对同一天内是单调的。
+    #[test]
+    fn fmt_utc_time_is_zero_padded_clock() {
+        assert_eq!(fmt_utc_time(0), "00:00:00");
+        assert_eq!(fmt_utc_time(3661), "01:01:01");
+        assert_eq!(fmt_utc_time(86399), "23:59:59");
+        // 跨天回绕
+        assert_eq!(fmt_utc_time(86400), "00:00:00");
+    }
+
+    /// 重置提示：已过期和未来两种情况。
+    #[test]
+    fn reset_hint_distinguishes_past_and_future() {
+        let c = ctx(true);
+        assert_eq!(reset_hint(&c, 0), "重置点已过");
+        let future = reset_hint(&c, now_unix() + 7200);
+        assert!(future.starts_with("重置于"), "got: {future}");
+        assert!(future.ends_with('后'), "got: {future}");
+    }
+
+    /// 错误 key 的翻译：中英都要有，且未知 key 原样返回。
+    #[test]
+    fn error_text_translates_known_keys() {
+        assert_eq!(
+            ctx(true).error_text("devin.auth_expired"),
+            "Devin 登录态已失效，请重新登录 Devin Desktop"
+        );
+        assert_eq!(
+            ctx(false).error_text("devin.auth_expired"),
+            "Devin session expired — sign in to Devin Desktop again"
+        );
+        assert_eq!(ctx(true).error_text("totally.unknown"), "totally.unknown");
+    }
+
+    /// 错误 key 后面跟的细节要原样附上，方便排查。
+    #[test]
+    fn error_text_keeps_trailing_detail() {
+        let out = ctx(false).error_text("devin.request_failed: connection reset");
+        assert!(out.starts_with("network request failed"), "got: {out}");
+        assert!(out.contains("connection reset"), "got: {out}");
+    }
+
+    /// 最长前缀优先：`cursor.net_failed` 不能被更短的 key 抢先匹配。
+    #[test]
+    fn error_text_prefers_longest_key() {
+        let out = ctx(false).error_text("cursor.no_token_db: db locked");
+        assert!(out.contains("state.vscdb"), "got: {out}");
+        assert!(out.contains("db locked"), "got: {out}");
+    }
+
+    /// 退出码判定：任一数据源成功就不算全失败。
+    #[test]
+    fn all_failed_only_when_every_target_failed() {
+        let none = QuotaResults::default();
+        assert!(all_failed(&none, &["factory", "devin", "cursor"]));
+
+        let only_factory_ok = QuotaResults {
+            factory: Some(FactoryQuota {
+                ok: true,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert!(!all_failed(&only_factory_ok, &["factory", "devin", "cursor"]));
+        // 但如果只问 devin，那还是全失败
+        assert!(all_failed(&only_factory_ok, &["devin"]));
+
+        // ok=false 不等于成功
+        let all_not_ok = QuotaResults {
+            factory: Some(FactoryQuota {
+                ok: false,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert!(all_failed(&all_not_ok, &["factory"]));
+    }
+
+    /// 请求了 unknown target 时不应影响判定（防御性）。
+    #[test]
+    fn all_failed_ignores_unknown_targets() {
+        let results = QuotaResults::default();
+        assert!(all_failed(&results, &["nope"]));
+    }
 }

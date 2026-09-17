@@ -272,16 +272,6 @@
     font-size: 10px; color: var(--apple-secondary);
     flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .apple-badge {
-    padding: 1.5px 6px; border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.08);
-    font-size: 9.5px; font-weight: 500;
-    color: var(--apple-secondary);
-  }
-  .apple-badge.stale {
-    color: var(--apple-orange);
-    background: rgba(255, 159, 10, 0.14);
-  }
 
   .grid-3 {
     display: grid;
@@ -466,7 +456,7 @@ const TEXT = {
     'loading.pill': '读取中…', 'loading.board': '正在同步用量…',
     'footer.updated': '更新于 {0}', 'footer.auto': '{0}m 自动更新',
     'empty': '暂无数据', 'card.read_failed': '读取失败', 'unknown': '未知错误',
-    'devin.stale': '本地缓存', 'devin.daily': '今日已用', 'devin.weekly': '本周已用',
+    'devin.daily': '今日已用', 'devin.weekly': '本周已用',
     'win.fiveHour': '5 小时', 'win.weekly': '7 天', 'win.monthly': '30 天',
     'factory.core': '免费模型池 (Core)', 'factory.overage': '超额策略', 'factory.default': '默认',
     'factory.prepaid': '预付余额', 'cell.realtime': '实时计费', 'cell.no_data': '无数据',
@@ -485,7 +475,7 @@ const TEXT = {
     'loading.pill': 'Loading…', 'loading.board': 'Syncing usage…',
     'footer.updated': 'Updated {0}', 'footer.auto': '{0}m auto refresh',
     'empty': 'No data yet', 'card.read_failed': 'Read failed', 'unknown': 'unknown error',
-    'devin.stale': 'local cache', 'devin.daily': 'Used today', 'devin.weekly': 'Used this week',
+    'devin.daily': 'Used today', 'devin.weekly': 'Used this week',
     'win.fiveHour': '5 hours', 'win.weekly': '7 days', 'win.monthly': '30 days',
     'factory.core': 'Free model pool (Core)', 'factory.overage': 'Overage policy', 'factory.default': 'default',
     'factory.prepaid': 'Prepaid balance', 'cell.realtime': 'real-time billing', 'cell.no_data': 'no data',
@@ -765,12 +755,6 @@ function renderDevin(r) {
     return card;
   }
 
-  if (r.stale) {
-    const badge = document.createElement('span');
-    badge.className = 'apple-badge stale';
-    badge.textContent = t('devin.stale');
-    meta.before(badge);
-  }
   meta.textContent = [r.planName, r.email].filter(Boolean).join(' · ');
 
   const grid = document.createElement('div');
@@ -971,7 +955,7 @@ function worstSeverity(results) {
   if (f && !f.ok) return 'danger';
 
   const d = results?.devin;
-  if (d?.ok && !d.stale) {
+  if (d?.ok) {
     if (typeof d.dailyRemainingPercent === 'number') pcts.push(100 - d.dailyRemainingPercent);
     if (typeof d.weeklyRemainingPercent === 'number') pcts.push(100 - d.weeklyRemainingPercent);
   }
