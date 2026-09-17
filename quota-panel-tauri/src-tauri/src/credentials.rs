@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 // 只被 macOS 的 `security` 和 Windows 的凭据管理器两条路径用到。
 // Linux 上两个函数都被 cfg 掉，不加这道 cfg 就是 unused import，
 // clippy -D warnings 会直接失败（CI 上就是这么红过一次）。
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use std::process::Command;
 use base64::prelude::*;
 use rusqlite::{Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use std::process::Command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FactoryAuth {
@@ -68,7 +68,11 @@ fn open_vscdb_readonly(db_path: &Path) -> Result<Connection, String> {
                 )
             })?;
             conn.pragma_update(None, "query_only", true).map_err(|e| {
-                format!("cred.sqlite_readonly_mode: path={} err={}", db_path.display(), e)
+                format!(
+                    "cred.sqlite_readonly_mode: path={} err={}",
+                    db_path.display(),
+                    e
+                )
             })?;
             conn
         }
@@ -300,8 +304,8 @@ fn decrypt_factory_payload(
 ) -> Result<Vec<u8>, String> {
     use aes::cipher::{BlockEncrypt, KeyInit};
     use aes::Aes256;
-    use ghash::universal_hash::generic_array::GenericArray;
     use ctr::cipher::{KeyIvInit, StreamCipher};
+    use ghash::universal_hash::generic_array::GenericArray;
     use ghash::universal_hash::UniversalHash;
     use ghash::GHash;
 
@@ -311,8 +315,8 @@ fn decrypt_factory_payload(
     // 当 IV 为 16 字节时，通过 GHASH 计算初始计数器 J0，再用 CTR 解密密文
 
     // 0. H = AES_K(0^128)：GCM 的哈希子密钥，J0 推导和认证 tag 都要用
-    let cipher_block = Aes256::new_from_slice(key_bytes)
-        .map_err(|e| format!("Invalid AES key: {}", e))?;
+    let cipher_block =
+        Aes256::new_from_slice(key_bytes).map_err(|e| format!("Invalid AES key: {}", e))?;
     let mut h = [0u8; 16];
     cipher_block.encrypt_block((&mut h).into());
 
@@ -408,9 +412,17 @@ pub fn load_devin_token() -> Result<(String, String), String> {
     // Check Devin CLI credentials.toml candidates
     let cli_candidates = [
         home.join(".config").join("devin").join("credentials.toml"),
-        home.join(".codeium").join("windsurf").join("credentials.toml"),
-        home.join("AppData").join("Roaming").join("devin").join("credentials.toml"),
-        home.join("Library").join("Application Support").join("devin").join("credentials.toml"),
+        home.join(".codeium")
+            .join("windsurf")
+            .join("credentials.toml"),
+        home.join("AppData")
+            .join("Roaming")
+            .join("devin")
+            .join("credentials.toml"),
+        home.join("Library")
+            .join("Application Support")
+            .join("devin")
+            .join("credentials.toml"),
     ];
 
     for path in &cli_candidates {
@@ -422,7 +434,10 @@ pub fn load_devin_token() -> Result<(String, String), String> {
                         if let Some((_, v)) = trimmed.split_once('=') {
                             let clean = v.trim().trim_matches('"').trim_matches('\'');
                             if !clean.is_empty() {
-                                return Ok((clean.to_string(), "Devin CLI credentials".to_string()));
+                                return Ok((
+                                    clean.to_string(),
+                                    "Devin CLI credentials".to_string(),
+                                ));
                             }
                         }
                     }
@@ -497,7 +512,10 @@ pub fn load_devin_token() -> Result<(String, String), String> {
 
     let mut err = "devin.no_session".to_string();
     if !db_errors.is_empty() {
-        err = format!("devin.no_session: state.vscdb errors: {}", db_errors.join("; "));
+        err = format!(
+            "devin.no_session: state.vscdb errors: {}",
+            db_errors.join("; ")
+        );
     }
     Err(err)
 }
@@ -675,6 +693,9 @@ mod tests {
         );
         // NULL 表示键存在但无值，以及非 UTF-8 的 BLOB，都应视为「读不到」
         assert_eq!(sqlite_value_to_string(SqlValue::Null), None);
-        assert_eq!(sqlite_value_to_string(SqlValue::Blob(vec![0xff, 0xfe])), None);
+        assert_eq!(
+            sqlite_value_to_string(SqlValue::Blob(vec![0xff, 0xfe])),
+            None
+        );
     }
 }

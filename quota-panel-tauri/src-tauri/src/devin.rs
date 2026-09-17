@@ -1,6 +1,8 @@
 use crate::credentials::load_devin_token;
 use crate::models::DevinQuota;
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE};
+use reqwest::header::{
+    HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE,
+};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn now_millis() -> i64 {
@@ -167,8 +169,7 @@ fn get_sub(fields: &[PbField], target_field: u32) -> Option<Vec<u8>> {
 }
 
 fn get_string(fields: &[PbField], target_field: u32) -> Option<String> {
-    get_sub(fields, target_field)
-        .and_then(|bytes| String::from_utf8(bytes).ok())
+    get_sub(fields, target_field).and_then(|bytes| String::from_utf8(bytes).ok())
 }
 
 fn get_timestamp(fields: &[PbField], target_field: u32) -> Option<i64> {
@@ -336,7 +337,17 @@ mod tests {
     /// 用 protobuf 规范里的自有例子（300 -> AC 02）当锚点。
     #[test]
     fn varint_roundtrips() {
-        for value in [0u64, 1, 127, 128, 300, 16383, 16384, u32::MAX as u64, u64::MAX] {
+        for value in [
+            0u64,
+            1,
+            127,
+            128,
+            300,
+            16383,
+            16384,
+            u32::MAX as u64,
+            u64::MAX,
+        ] {
             let encoded = encode_varint(value);
             let (decoded, pos) = decode_varint(&encoded, 0).unwrap();
             assert_eq!(decoded, value, "value: {value}");
@@ -388,7 +399,11 @@ mod tests {
         let fields = parse_proto(&body);
         assert_eq!(get_string(&fields, 1).unwrap(), "hello");
         assert_eq!(get_varint(&fields, 2).unwrap(), 150);
-        assert_eq!(get_string(&fields, 2), None, "字段 2 是 varint，不该被当成串");
+        assert_eq!(
+            get_string(&fields, 2),
+            None,
+            "字段 2 是 varint，不该被当成串"
+        );
     }
 
     /// field number 0 是非法值，解析必须停住，不能无限循环。
@@ -431,7 +446,7 @@ mod tests {
         plan_status.extend(encode_varint(7)); // acu consumed
         plan_status.extend(encode_tag(20, 0));
         plan_status.extend(encode_varint(20)); // acu limit
-                                              // Timestamp{seconds: 1700000000} 放在 field 2 / 3
+                                               // Timestamp{seconds: 1700000000} 放在 field 2 / 3
         let mut ts_start = encode_tag(1, 0);
         ts_start.extend(encode_varint(1_690_000_000));
         plan_status.extend(encode_message(2, &ts_start));

@@ -77,12 +77,17 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: quota-panel-tauri/src-tauri
           key: lint
+
+      # 格式检查放在编译类检查之前：它最便宜，失败信息也最直白
+      - name: cargo fmt
+        working-directory: quota-panel-tauri/src-tauri
+        run: cargo fmt --check
 
       # 把 warning 当错误，防止慢慢积攒
       - name: cargo clippy
@@ -94,6 +99,5 @@ jobs:
       - name: Check UI
         run: node scripts/check-ui.cjs
 
-      # 这里刻意**没有** cargo fmt --check：这个仓库从第一版起就没跑过 rustfmt，
-      # 加上它会让所有既有文件立刻变红，等于用格式问题淹没真正的编译/测试失败。
-      # 想启用就先单独跑一次 cargo fmt、提交格式化结果，再加这一步。
+      # 格式检查已启用：源码在提交 b2a468f 之后跑过一次 cargo fmt，
+      # 从那以后 cargo fmt --check 就是干净的（见上面 lint job 的第一步）。

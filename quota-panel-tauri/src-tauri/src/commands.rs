@@ -40,7 +40,11 @@ pub async fn set_locale(
     state: State<'_, Arc<AppState>>,
     locale: String,
 ) -> Result<(), String> {
-    let norm = if locale.to_lowercase().starts_with("zh") { "zh" } else { "en" };
+    let norm = if locale.to_lowercase().starts_with("zh") {
+        "zh"
+    } else {
+        "en"
+    };
     {
         let mut guard = state.locale.lock().await;
         if *guard == norm {
@@ -58,11 +62,7 @@ pub async fn set_locale(
 }
 
 #[tauri::command]
-pub async fn resize_window(
-    window: WebviewWindow,
-    width: f64,
-    height: f64,
-) -> Result<(), String> {
+pub async fn resize_window(window: WebviewWindow, width: f64, height: f64) -> Result<(), String> {
     // 保持右上角贴边锚定：当窗口宽度变大时，向左侧延伸，右边缘位置保持不变
     let scale_factor = window.scale_factor().unwrap_or(1.0);
     let mut move_x = None;

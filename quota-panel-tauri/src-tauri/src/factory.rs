@@ -132,17 +132,16 @@ pub async fn fetch_factory(client: &reqwest::Client) -> FactoryQuota {
         }
     };
 
-    let plan_name = val.get("planName").and_then(|p| p.as_str()).map(String::from);
+    let plan_name = val
+        .get("planName")
+        .and_then(|p| p.as_str())
+        .map(String::from);
     let overage_preference = val
         .get("overagePreference")
         .and_then(|p| p.as_str())
         .map(String::from);
-    let extra_usage_balance_cents = val
-        .get("extraUsageBalanceCents")
-        .and_then(|c| c.as_i64());
-    let extra_usage_allowed = val
-        .get("extraUsageAllowed")
-        .and_then(|a| a.as_bool());
+    let extra_usage_balance_cents = val.get("extraUsageBalanceCents").and_then(|c| c.as_i64());
+    let extra_usage_allowed = val.get("extraUsageAllowed").and_then(|a| a.as_bool());
 
     let limits_obj = val.get("limits");
     let standard = limits_obj.and_then(|l| parse_window_group(l.get("standard")));

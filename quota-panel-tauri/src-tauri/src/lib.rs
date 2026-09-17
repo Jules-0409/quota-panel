@@ -32,9 +32,17 @@ pub struct AppState {
 /// 托盘菜单 / tooltip 的文案，按语言取
 pub(crate) fn tray_labels(locale: &str) -> (&'static str, &'static str, &'static str) {
     if locale == "zh" {
-        ("立即刷新额度", "退出 Quota Panel", "Quota Panel - AI 额度监控")
+        (
+            "立即刷新额度",
+            "退出 Quota Panel",
+            "Quota Panel - AI 额度监控",
+        )
     } else {
-        ("Refresh quotas now", "Quit Quota Panel", "Quota Panel - AI quota monitor")
+        (
+            "Refresh quotas now",
+            "Quit Quota Panel",
+            "Quota Panel - AI quota monitor",
+        )
     }
 }
 
@@ -86,10 +94,15 @@ pub async fn query_for_cli() -> QuotaResults {
         .build()
         .unwrap_or_default();
 
-    query_all_quotas(&AppConfig::default(), &client).await.results
+    query_all_quotas(&AppConfig::default(), &client)
+        .await
+        .results
 }
 
-pub(crate) async fn do_refresh(app: &tauri::AppHandle, state: &AppState) -> Result<QuotaPayload, String> {
+pub(crate) async fn do_refresh(
+    app: &tauri::AppHandle,
+    state: &AppState,
+) -> Result<QuotaPayload, String> {
     let _ = app.emit("refresh-start", ());
     let cfg = {
         let guard = state.config.lock().await;

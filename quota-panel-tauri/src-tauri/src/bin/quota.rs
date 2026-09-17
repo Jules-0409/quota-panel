@@ -97,7 +97,11 @@ impl Ctx {
     fn t(&self, key: &str) -> String {
         let table: &[(&str, &str, &str)] = &[
             ("factory.standard", "Standard 用量", "Standard usage"),
-            ("factory.core", "Droid Core (免费模型池)", "Droid Core (free model pool)"),
+            (
+                "factory.core",
+                "Droid Core (免费模型池)",
+                "Droid Core (free model pool)",
+            ),
             ("factory.overage", "超额策略", "Overage policy"),
             ("factory.prepaid", "预付余额", "Prepaid balance"),
             ("devin.daily", "今日 已用", "Used today"),
@@ -114,7 +118,11 @@ impl Ctx {
             ("cursor.api", "API  已用", "API used"),
             ("cursor.requests", "请求", "Requests"),
             ("cursor.total", "综合用量", "Combined"),
-            ("cursor.grok", "Grok Bot 周额度 已用", "Grok Bot weekly used"),
+            (
+                "cursor.grok",
+                "Grok Bot 周额度 已用",
+                "Grok Bot weekly used",
+            ),
             ("cursor.cycle", "账期", "Billing cycle"),
             ("cursor.none", "没有取到任何数据", "No data available"),
             ("dur.reset", "已重置", "reset"),
@@ -139,28 +147,112 @@ impl Ctx {
     fn error_text(&self, raw: &str) -> String {
         let zh = self.zh;
         let table: &[(&str, &str, &str)] = &[
-            ("cred.sqlite_open", "无法只读打开本地 SQLite 凭据库", "cannot open the local SQLite credential db read-only"),
-            ("cred.sqlite_readonly_mode", "无法把本地库设为只读查询模式", "cannot set the local db to read-only mode"),
-            ("cred.sqlite_query", "查询本地凭据表失败", "query on the local credential table failed"),
-            ("cred.key_read", "读取本地凭据键失败", "failed to read a local credential key"),
-            ("cred.decrypt_key_mismatch", "解密失败：加密密钥不匹配", "decryption failed: encryption key mismatch"),
-            ("cred.devin_windsurf_parse", "解析 Devin 登录态失败", "failed to parse the Devin session state"),
-            ("devin.no_session", "没找到有效的 Devin 登录态或凭据", "no valid Devin session or credentials found"),
-            ("devin.auth_expired", "Devin 登录态已失效，请重新登录 Devin Desktop", "Devin session expired — sign in to Devin Desktop again"),
-            ("devin.credential_task_failed", "读取 Devin 凭据的任务失败", "the Devin credential task failed"),
-            ("devin.request_failed", "网络请求失败", "network request failed"),
-            ("devin.http_status", "Devin 接口返回异常状态", "Devin API returned an error status"),
-            ("devin.body_read_failed", "读取 Devin 响应失败", "failed to read the Devin response"),
-            ("factory.credential_task_failed", "读取 Factory 凭据的任务失败", "the Factory credential task failed"),
-            ("factory.auth_expired", "Factory 登录态已失效，请重新登录 droid", "Factory session expired — sign in to droid again"),
-            ("cursor.no_token", "未检测到 Cursor Access Token，请确认已在 Cursor 中登录", "no Cursor access token found — make sure you are signed in to Cursor"),
-            ("cursor.no_token_db", "读取 Cursor state.vscdb 失败", "failed to read Cursor state.vscdb"),
-            ("cursor.net_failed", "网络请求失败", "network request failed"),
-            ("cursor.json_parse_failed", "解析 JSON 响应失败", "failed to parse the JSON response"),
-            ("cursor.auth_expired", "Cursor 登录态已失效，请在 Cursor 中重新登录", "Cursor session expired — sign in to Cursor again"),
-            ("cursor.auth_task_failed", "读取 Cursor 登录态的任务失败", "the Cursor session read task failed"),
+            (
+                "cred.sqlite_open",
+                "无法只读打开本地 SQLite 凭据库",
+                "cannot open the local SQLite credential db read-only",
+            ),
+            (
+                "cred.sqlite_readonly_mode",
+                "无法把本地库设为只读查询模式",
+                "cannot set the local db to read-only mode",
+            ),
+            (
+                "cred.sqlite_query",
+                "查询本地凭据表失败",
+                "query on the local credential table failed",
+            ),
+            (
+                "cred.key_read",
+                "读取本地凭据键失败",
+                "failed to read a local credential key",
+            ),
+            (
+                "cred.decrypt_key_mismatch",
+                "解密失败：加密密钥不匹配",
+                "decryption failed: encryption key mismatch",
+            ),
+            (
+                "cred.devin_windsurf_parse",
+                "解析 Devin 登录态失败",
+                "failed to parse the Devin session state",
+            ),
+            (
+                "devin.no_session",
+                "没找到有效的 Devin 登录态或凭据",
+                "no valid Devin session or credentials found",
+            ),
+            (
+                "devin.auth_expired",
+                "Devin 登录态已失效，请重新登录 Devin Desktop",
+                "Devin session expired — sign in to Devin Desktop again",
+            ),
+            (
+                "devin.credential_task_failed",
+                "读取 Devin 凭据的任务失败",
+                "the Devin credential task failed",
+            ),
+            (
+                "devin.request_failed",
+                "网络请求失败",
+                "network request failed",
+            ),
+            (
+                "devin.http_status",
+                "Devin 接口返回异常状态",
+                "Devin API returned an error status",
+            ),
+            (
+                "devin.body_read_failed",
+                "读取 Devin 响应失败",
+                "failed to read the Devin response",
+            ),
+            (
+                "factory.credential_task_failed",
+                "读取 Factory 凭据的任务失败",
+                "the Factory credential task failed",
+            ),
+            (
+                "factory.auth_expired",
+                "Factory 登录态已失效，请重新登录 droid",
+                "Factory session expired — sign in to droid again",
+            ),
+            (
+                "cursor.no_token",
+                "未检测到 Cursor Access Token，请确认已在 Cursor 中登录",
+                "no Cursor access token found — make sure you are signed in to Cursor",
+            ),
+            (
+                "cursor.no_token_db",
+                "读取 Cursor state.vscdb 失败",
+                "failed to read Cursor state.vscdb",
+            ),
+            (
+                "cursor.net_failed",
+                "网络请求失败",
+                "network request failed",
+            ),
+            (
+                "cursor.json_parse_failed",
+                "解析 JSON 响应失败",
+                "failed to parse the JSON response",
+            ),
+            (
+                "cursor.auth_expired",
+                "Cursor 登录态已失效，请在 Cursor 中重新登录",
+                "Cursor session expired — sign in to Cursor again",
+            ),
+            (
+                "cursor.auth_task_failed",
+                "读取 Cursor 登录态的任务失败",
+                "the Cursor session read task failed",
+            ),
             ("grok.net_failed", "网络请求失败", "network request failed"),
-            ("grok.parse_failed", "解析响应失败", "failed to parse the response"),
+            (
+                "grok.parse_failed",
+                "解析响应失败",
+                "failed to parse the response",
+            ),
         ];
 
         // key 后面可能跟 `: 细节`，匹配最长的 key 前缀，细节原样附在后面
@@ -386,10 +478,7 @@ fn print_devin(c: &Ctx, r: &DevinQuota) {
         }
     }
     if let Some(src) = &r.source {
-        println!(
-            "  {}",
-            c.dim(&format!("{} ({src})", c.t("devin.source")))
-        );
+        println!("  {}", c.dim(&format!("{} ({src})", c.t("devin.source"))));
     }
 }
 
@@ -467,7 +556,11 @@ fn print_cursor(c: &Ctx, r: &CursorQuota) {
     if let Some(reset_at) = r.cycle_reset_unix {
         println!(
             "    {}",
-            c.dim(&format!("{} {}", c.t("cursor.cycle"), reset_hint(c, reset_at)))
+            c.dim(&format!(
+                "{} {}",
+                c.t("cursor.cycle"),
+                reset_hint(c, reset_at)
+            ))
         );
     }
 
@@ -611,7 +704,10 @@ async fn main() {
         let header = if c.zh {
             format!("刷新于 {} UTC  (Ctrl+C 退出)", fmt_utc_time(now_unix()))
         } else {
-            format!("Refreshed at {} UTC  (Ctrl+C to quit)", fmt_utc_time(now_unix()))
+            format!(
+                "Refreshed at {} UTC  (Ctrl+C to quit)",
+                fmt_utc_time(now_unix())
+            )
         };
         println!("{}", c.dim(&header));
         let _ = once(&c, &targets, json).await;
@@ -625,7 +721,12 @@ async fn main() {
 /// 与其悄悄把一个 UTC 时间当成当地时间打出去，不如写明是 UTC。
 fn fmt_utc_time(unix: i64) -> String {
     let secs = unix.rem_euclid(86400);
-    format!("{:02}:{:02}:{:02}", secs / 3600, (secs % 3600) / 60, secs % 60)
+    format!(
+        "{:02}:{:02}:{:02}",
+        secs / 3600,
+        (secs % 3600) / 60,
+        secs % 60
+    )
 }
 
 #[cfg(test)]
@@ -828,7 +929,10 @@ mod tests {
             }),
             ..Default::default()
         };
-        assert!(!all_failed(&only_factory_ok, &["factory", "devin", "cursor"]));
+        assert!(!all_failed(
+            &only_factory_ok,
+            &["factory", "devin", "cursor"]
+        ));
         // 但如果只问 devin，那还是全失败
         assert!(all_failed(&only_factory_ok, &["devin"]));
 

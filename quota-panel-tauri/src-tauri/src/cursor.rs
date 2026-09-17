@@ -50,8 +50,7 @@ fn find_cursor_vscdb_path() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         if let Ok(appdata) = std::env::var("APPDATA") {
-            let p = PathBuf::from(appdata)
-                .join("Cursor\\User\\globalStorage\\state.vscdb");
+            let p = PathBuf::from(appdata).join("Cursor\\User\\globalStorage\\state.vscdb");
             if p.exists() {
                 return Some(p);
             }
@@ -161,10 +160,14 @@ fn load_cursor_auth() -> Result<CursorAuth, String> {
                 }
                 membership_type = parsed.get("cursorAuth/stripeMembershipType").cloned();
                 subscription_status = parsed.get("cursorAuth/stripeSubscriptionStatus").cloned();
-                auth_id = ["glass.lastSignedInAuthId", "cursorAuth/stripeMembershipAuthId", "adminSettings.cachedAuthId"]
-                    .iter()
-                    .find_map(|k| parsed.get(*k).filter(|v| !v.is_empty()).cloned())
-                    .unwrap_or_default();
+                auth_id = [
+                    "glass.lastSignedInAuthId",
+                    "cursorAuth/stripeMembershipAuthId",
+                    "adminSettings.cachedAuthId",
+                ]
+                .iter()
+                .find_map(|k| parsed.get(*k).filter(|v| !v.is_empty()).cloned())
+                .unwrap_or_default();
             }
             Err(e) => db_error = Some(e),
         }
@@ -258,7 +261,10 @@ async fn fetch_usage_summary(
         if !cookie_user.is_empty() {
             req = req.header(
                 "Cookie",
-                format!("WorkosCursorSessionToken={}%3A%3A{}", cookie_user, auth.token),
+                format!(
+                    "WorkosCursorSessionToken={}%3A%3A{}",
+                    cookie_user, auth.token
+                ),
             );
         }
         req
@@ -334,7 +340,10 @@ async fn fetch_grok_usage(client: &reqwest::Client, token: &str) -> GrokUsage {
             "cursor.auth_expired".into()
         } else {
             let body = resp.text().await.unwrap_or_default();
-            format!("HTTP {code}: {}", body.chars().take(200).collect::<String>())
+            format!(
+                "HTTP {code}: {}",
+                body.chars().take(200).collect::<String>()
+            )
         });
     }
 
@@ -347,12 +356,10 @@ async fn fetch_grok_usage(client: &reqwest::Client, token: &str) -> GrokUsage {
         percent_used: data.usage_percent,
         has_available_usage: data.has_available_usage,
         reset_unix: data.next_reset_timestamp_utc.and_then(|ts| {
-            ts.as_str()
-                .and_then(parse_iso_to_unix)
-                .or_else(|| {
-                    ts.as_i64()
-                        .map(|n| if n > 1_000_000_000_000 { n / 1000 } else { n })
-                })
+            ts.as_str().and_then(parse_iso_to_unix).or_else(|| {
+                ts.as_i64()
+                    .map(|n| if n > 1_000_000_000_000 { n / 1000 } else { n })
+            })
         }),
         error: None,
     }
@@ -473,7 +480,11 @@ pub async fn query_cursor_quota(client: &reqwest::Client) -> CursorQuota {
         name: "Cursor".into(),
         plan_name: membership_type.clone().or_else(|| Some("Pro".into())),
         email: auth.email,
-        user_id: if auth.user_id.is_empty() { None } else { Some(auth.user_id) },
+        user_id: if auth.user_id.is_empty() {
+            None
+        } else {
+            Some(auth.user_id)
+        },
         membership_type,
         subscription_status: auth.subscription_status,
         auto_percent_used,
@@ -541,14 +552,14 @@ mod tests {
     fn malformed_input_returns_none() {
         let cases = [
             "",
-            "2026-09-17",              // 没有时间部分
+            "2026-09-17", // 没有时间部分
             "not-a-date",
-            "2026-09-17T12:34Z",       // 只有时分
-            "2026-09-17T12",           // 只有小时
-            "2026/09/17T12:34:56Z",    // 用斜杠而不是减号
-            "2026-09-17 12:34:56Z",    // 用空格而不是 T
-            "T12:34:56Z",              // 没有日期
-            "2026-09-17T12:34:56",     // 无 Z 也算合法（trim_end_matches 会放过）
+            "2026-09-17T12:34Z",    // 只有时分
+            "2026-09-17T12",        // 只有小时
+            "2026/09/17T12:34:56Z", // 用斜杠而不是减号
+            "2026-09-17 12:34:56Z", // 用空格而不是 T
+            "T12:34:56Z",           // 没有日期
+            "2026-09-17T12:34:56",  // 无 Z 也算合法（trim_end_matches 会放过）
         ];
         // 最后一项其实可以解析成功，单独断言，其余都是 None
         for input in &cases[..cases.len() - 1] {

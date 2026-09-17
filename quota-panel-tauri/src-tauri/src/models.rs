@@ -133,7 +133,10 @@ mod tests {
         assert_eq!(json["results"]["factory"]["planName"], "Pro");
         assert_eq!(json["results"]["factory"]["extraUsageBalanceCents"], 1234);
         assert_eq!(json["results"]["devin"]["dailyRemainingPercent"], 25.0);
-        assert_eq!(json["results"]["devin"]["dailyResetAtUnix"], 1_700_000_000i64);
+        assert_eq!(
+            json["results"]["devin"]["dailyResetAtUnix"],
+            1_700_000_000i64
+        );
         assert_eq!(json["results"]["cursor"]["autoPercentUsed"], 12.5);
         assert_eq!(json["results"]["cursor"]["grokPercentUsed"], 80.0);
         assert_eq!(json["results"]["cursor"]["grokHasAvailableUsage"], false);
