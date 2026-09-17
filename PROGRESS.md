@@ -12,7 +12,7 @@
 **可用。** 三个数据源（Factory / Devin / Cursor 含 Grok Bot）在本机实测
 都能取到数，`quota` CLI 和 GUI 共用同一套 fetcher。
 
-- 工作树干净。
+- 工作树干净，`main` 与 `origin/main` 同步于 `ed407e0`。
 - 2026-09-17 推送的那批提交修掉了下面记录的 3 个 bug、补上了测试和 CI。
   **`c424ac5` 及更早的版本没有这些修复。**
 - 推送经过当次明确授权；以后每次推送仍要重新获得授权。
@@ -30,7 +30,8 @@
 - 界面改动过眼睛：`scripts/make-ui-preview.cjs` 生成离线预览（假数据、不碰真凭据），
   截图存在 `docs/evidence/panel-overview.png`，三张卡、警告/危险配色、
   「无数据」和「额度已耗尽」两个分支都正常
-- GitHub Actions 真跑过：四个 job 全绿（见下方「未验证 / 已知缺口」里的详情）
+- GitHub Actions 真跑过：四个 job 全绿（`ed407e0`，run 35182960691，
+  含新加的 `cargo fmt --check` 步骤）
 
 ## 提交记录
 
@@ -46,16 +47,18 @@ ede50ba Guard the Command import for non-unix platforms, and bump checkout to v5
 5bdbd7b Fix the ISO date and GCM IV parsing bugs, and add unit tests
 ```
 
-之后又追加了三个提交（**尚未推送**）：
+之后又追加了三个提交（**已推送**，2026-09-17，`main` = `ed407e0`）：
 
 ```
+ed407e0 PROGRESS.md: record the rustfmt pass and the pending docs commits
 2a5d7a8 Apply rustfmt and enforce it in CI
 b2a468f Make the docs machine-agnostic
 90f8f3e Add a README screenshot, and remove internal-only references from the docs
 ```
 
-这三个涉及对外可读性：删掉了文档里只对作者本机有意义的绝对路径和内网说明，
-补了一张假数据截图，并把格式化与格式检查补齐。
+这四个提交让仓库可以直接对外分享：删掉了文档里只对作者本机有意义的绝对路径
+和内网说明，补了一张假数据截图，把 rustfmt 补齐并把 `cargo fmt --check`
+加进 CI。仓库简介和 topics 也已设置。
 
 本轮之前的：
 
@@ -110,6 +113,11 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 
 ## 未验证 / 已知缺口 ⚠️
 
+- ⚠️ **公开提交里的作者邮箱仍是真实 Gmail**（`liujufu019@gmail.com`，全部提交都是）。
+  GitHub 的 commits API 和 `.patch` 文件都会直接返回它（个人主页上看不到，但提交里是明文）。
+  想换成 GitHub 私密邮箱 `284996397+Jules-0409@users.noreply.github.com` 需要改写全部历史
+  并强推，这属于改 Git 身份，Droid 的规则不允许它自己动手，要 Jules 亲自跑。
+  现成脚本：`tmp/rewrite-emails.ps1`（含备份与指纹核对，跑完可由 Droid 核对并强推）。
 - ⚠️ **macOS 侧没跑过**。这台是 Windows。`credentials.rs` 的 Keychain 分支、
   `cursor.rs` 的 `security` 回退、`lib.rs` 的 macOS 私有 API 窗口行为
   **都没在本机验证**。跨平台改动要特别小心。
