@@ -140,5 +140,25 @@ quota-panel-tauri/
 └── ui/index.html            # 整个界面：单文件、零外部依赖
 ```
 
+## 测试
+
+取数逻辑依赖本机登录态，CI 上跑不了真实接口，所以**纯函数一律配单元测试**：
+日期解析、protobuf 编解码、AES-GCM 解密、重试判定、前后端数据契约、CLI 的输出与双语文案。
+
+```bash
+cd quota-panel-tauri/src-tauri
+cargo test                    # 单元测试
+cargo clippy --all-targets    # 静态检查
+```
+
+界面（单文件、无构建步骤）另有一个静态检查脚本，会核对文案字典的 key 完整性、
+前后端字段名一致性和 JS 语法：
+
+```bash
+node scripts/check-ui.cjs
+```
+
+`scripts/` 下还有两个生成测试向量的一次性脚本（用 Node 当对照，见该目录的 README）。
+
 性能参考（macOS 实测，含 WebKit 的 GPU / WebContent / Networking 子进程）：
 空闲约 **150 MB RSS**，作为对照，它替代的 Electron 版本约 470 MB。

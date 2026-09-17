@@ -163,5 +163,28 @@ quota-panel-tauri/
 └── ui/index.html            # the entire UI: single file, zero external dependencies
 ```
 
+## Tests
+
+The fetchers depend on local login state, so they cannot be exercised against the real APIs in
+CI. Every **pure function therefore carries unit tests**: date parsing, protobuf encode/decode,
+AES-GCM decryption, retry decisions, the backend/UI data contract, and the CLI's output and
+bilingual strings.
+
+```bash
+cd quota-panel-tauri/src-tauri
+cargo test                    # unit tests
+cargo clippy --all-targets    # lints
+```
+
+The UI (single file, no build step) has a static check that verifies translation-key
+completeness, backend/UI field-name agreement, and JS syntax:
+
+```bash
+node scripts/check-ui.cjs
+```
+
+`scripts/` also holds two one-off generators for test vectors (they use Node as the reference;
+see that directory's README).
+
 Measured on macOS (including WebKit's GPU / WebContent / Networking child processes):
 about **150 MB RSS** idle. For comparison, the Electron version it replaced used ~470 MB.
