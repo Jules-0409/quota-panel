@@ -135,13 +135,13 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 
 ## 常用命令
 
-```powershell
-cd D:\code2\quota-panel\quota-panel-tauri\src-tauri
-& "$env:USERPROFILE\.cargo\bin\cargo.exe" test --bins --lib
-& "$env:USERPROFILE\.cargo\bin\cargo.exe" clippy --all-targets -- -D warnings
-& "$env:USERPROFILE\.cargo\bin\cargo.exe" build --release --bin quota
-.\target\release\quota.exe              # 三个数据源
-$env:QUOTA_LANG='en'; .\target\release\quota.exe --json
+```bash
+cd quota-panel-tauri/src-tauri
+cargo test --bins --lib
+cargo clippy --all-targets -- -D warnings
+cargo build --release --bin quota
+./target/release/quota              # 三个数据源（Windows 上是 quota.exe）
+QUOTA_LANG=en ./target/release/quota --json
 ```
 
 ## 怎么验证「没坏」

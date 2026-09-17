@@ -10,10 +10,9 @@
 
 两个脚本都是**只打印结果、不写文件**，改完把输出手抄回对应的 `#[test]`：
 
-```powershell
-cd D:\code2\quota-panel
-node scripts\gen-gcm-vectors.cjs
-node scripts\gen-date-vectors.cjs
+```bash
+node scripts/gen-gcm-vectors.cjs
+node scripts/gen-date-vectors.cjs
 ```
 
 关键：`gen-gcm-vectors.cjs` 里的密钥必须是 `000102...1f` 这串 hex，

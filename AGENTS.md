@@ -66,11 +66,10 @@ Devin 一栏每轮都直接打服务端接口。**接口失败就如实报错，
 
 ## 三、验证方式（每次改完都要跑）
 
-```powershell
-# 在 quota-panel-tauri/src-tauri 下。注意这台机器 git / cargo 不在默认 PATH 里
-cd D:\code2\quota-panel\quota-panel-tauri\src-tauri
-& "$env:USERPROFILE\.cargo\bin\cargo.exe" test --bins --lib
-& "$env:USERPROFILE\.cargo\bin\cargo.exe" clippy --all-targets -- -D warnings
+```bash
+cd quota-panel-tauri/src-tauri
+cargo test --bins --lib
+cargo clippy --all-targets -- -D warnings
 ```
 
 **测试是真凭据的替代品**：这个项目的取数逻辑依赖本机登录态，
