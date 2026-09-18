@@ -6,6 +6,8 @@ pub mod devin;
 pub mod factory;
 pub mod http;
 pub mod models;
+#[cfg(target_os = "macos")]
+pub mod tray_icon;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -173,15 +175,28 @@ pub fn run() {
             // Setup system tray menu（初始英文，UI 启动后按系统语言 set_locale 重建）
             let menu = build_tray_menu(app.handle(), "en")?;
 
-            let icon = app.default_window_icon().cloned();
-
             let mut tray_builder = TrayIconBuilder::with_id("main-tray")
                 .menu(&menu)
                 .tooltip(tray_labels("en").2)
                 .show_menu_on_left_click(false);
 
-            if let Some(ic) = icon {
-                tray_builder = tray_builder.icon(ic);
+            // macOS 的托盘用单色模板图，系统按菜单栏明暗自动上色；
+            // 其他平台的托盘没有 template 机制，黑白色的模板图标在深色任务栏上等于隐形，
+            // 所以还是用彩色 App 图标。
+            #[cfg(target_os = "macos")]
+            {
+                let tray_icon = tauri::image::Image::new_owned(
+                    crate::tray_icon::template_rgba(),
+                    crate::tray_icon::SIZE,
+                    crate::tray_icon::SIZE,
+                );
+                tray_builder = tray_builder.icon(tray_icon).icon_as_template(true);
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                if let Some(ic) = app.default_window_icon().cloned() {
+                    tray_builder = tray_builder.icon(ic);
+                }
             }
 
             let state_for_tray = state.clone();
