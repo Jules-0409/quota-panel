@@ -12,8 +12,8 @@
 **可用。** 三个数据源（Factory / Devin / Cursor 含 Grok Bot）在本机实测
 都能取到数，`quota` CLI 和 GUI 共用同一套 fetcher。
 
-- 工作树干净；`main` 与 `origin/main` 同步于 `affb83c`，之后有两笔本地提交
-  （`5b49365` 拆模块 + 本次记录），**未推送**。
+- 工作树干净；`main` 与 `origin/main` 同步于 `7c23bf9`（本轮从 `affb83c`
+  一路走到这里，全部已推送）。
 - 2026-09-17 推送的那批提交修掉了下面记录的 3 个 bug、补上了测试和 CI。
   **`c424ac5` 及更早的版本没有这些修复。**
 - 推送经过当次明确授权；以后每次推送仍要重新获得授权。
@@ -39,6 +39,7 @@
 - `cargo test --bins --lib` → **52 passed, 0 failed**（与拆分前一致）
 - `cargo clippy --all-targets -- -D warnings` → 通过，无 warning
 - `cargo fmt --check` → 通过
+- `node scripts/check-ui.cjs` → 通过
 
 ## 提交记录
 
@@ -67,17 +68,25 @@ b2a468f Make the docs machine-agnostic
 和内网说明，补了一张假数据截图，把 rustfmt 补齐并把 `cargo fmt --check`
 加进 CI。仓库简介和 topics 也已设置。
 
-再之后（2026-09-17 晚，从 macOS 机器上提交）：
+再之后（2026-09-17 晚，从 macOS 机器上提交，**全部已推送**）：
 
 ```
-affb83c Drop a redundant `return` in `load_factory_key`（已推送）
-5b49365 Split `credentials.rs` and `cursor.rs` into module directories（本地，未推送）
+affb83c Drop a redundant `return` in `load_factory_key`
+5b49365 Split `credentials.rs` and `cursor.rs` into module directories
+5fa4fc3 PROGRESS.md: record the module split and the latest push
+7c23bf9 Fix the UI check and stale references after the module split
 ```
 
 `5b49365` 是纯搬迁：`credentials.rs` 拆成 `credentials/`（6 个文件）、
 `cursor.rs` 拆成 `cursor/`（5 个文件），公开路径（`crate::credentials::*`、
 `crate::cursor::*`）不变，52 个测试一个不少。这就是 AGENTS.md 里
 「文件超 400 行就优先拆」那条。
+
+`7c23bf9` 修的是这次拆分留下的一个坑：`scripts/check-ui.cjs` 里硬编码了
+`src/cursor.rs`，拆完路径就没了，CI 的 `Check UI` 步骤红过一次；同一提交把
+两份 README、`scripts/README.md`、两个生成脚本和 `AGENTS.md` 里的旧文件名
+也一起清了。CI 已在 `7c23bf9` 跑绿（run 35292810278，`lint` + ubuntu /
+windows / macos 三个 `test` job）。
 
 本轮之前的：
 
