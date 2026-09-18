@@ -3,7 +3,7 @@
 **这个文件是「做到哪了」的唯一权威。** 只看它 + `git log` 就应该能接手。
 诚实优先：没验证的标 ⚠️，进度文件骗人比没有更糟。
 
-最后更新：2026-09-17
+最后更新：2026-09-18
 
 ---
 
@@ -12,13 +12,25 @@
 **可用。** 三个数据源（Factory / Devin / Cursor 含 Grok Bot）在本机实测
 都能取到数，`quota` CLI 和 GUI 共用同一套 fetcher。
 
-- 工作树干净。`origin/main` 在 `de12d7b`（那批已推送、CI 绿）；本地 `main` 比它多出
-  2026-09-18 的提交（配置持久化 `6a55bd5` + 这次的 PROGRESS 记录），**等推送授权**。
+- 工作树干净，`main` = `origin/main` = `78c168f`（CI run 35296711835 四个 job 全绿）。
+  之后只有「图标重做 + 真装一次 + 清理」这一轮的本地提交，**等推送授权**。
 - 2026-09-17 推送的那批提交修掉了下面记录的 3 个 bug、补上了测试和 CI。
   **`c424ac5` 及更早的版本没有这些修复。**
 - 推送经过当次明确授权；以后每次推送仍要重新获得授权。
 
-最近一次实跑验证（2026-09-18，macOS + 真实登录态）：
+最近一次实跑验证（2026-09-18 晚，macOS + 真实登录态，**全部在 `.dmg` 装出来的
+`/Applications/quota-panel.app` 上做的**）：
+
+- `cargo test --bins --lib` → **63 passed, 0 failed**（47 lib + 16 bin；托盘图标那 4 个是新增的）
+- `cargo clippy --all-targets -- -D warnings` → 通过；`cargo fmt --check` → 通过
+- `node scripts/check-ui.cjs` → 通过（TEXT 49 key × 2 语言，ERROR_TEXT 23 key × 2 语言）
+- 图标：新图 16/32/64/128px 逐档看过；托盘模板在菜单栏里 A/B（退出 App 前后各截一张，
+  差值只剩托盘那一小块）确认就是它
+- 配置读写（安装版实测）：手写 `config.json` 重启 → 胶囊按新阈值上色、设置页读到
+  `9 分钟 / 55% / 65%`；点「增加」→ 界面 `10m 自动更新` + 文件 `refreshMinutes: 10`；
+  危险阈值往下按被后端顶回 **56**
+
+上一次实跑验证（2026-09-18 白天，macOS + 真实登录态）：
 
 - `cargo test --bins --lib` → **59 passed, 0 failed**（43 lib + 16 bin；配置那几个单测是新增的）
 - `cargo clippy --all-targets -- -D warnings` → 通过，无 warning；`cargo fmt --check` → 通过
@@ -189,6 +201,39 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
   `ActivationPolicy::Accessory`，`lsappinfo` 实测从 `Foreground` 变 `UIElement`，
   手搓的和 tauri-cli 打的两种 `.app` 观感一致。
 
+## 最近做完的（2026-09-18 晚：图标重做、真装一次、清理）
+
+**图标重做。** 旧图标（三个同心环）缩到 16pt 就是一坨糊。新的一版是「蓝绿渐变底 +
+白色圆环 + 中心点」，母版 `icons/app-icon-1024.png` 按 Apple 的图标网格合成
+（1024 画布 / 图形 824×824 / 透明底 / 一层向下偏的柔和投影），再由 `cargo tauri icon`
+生成 `icon.icns`、`icon.ico` 和各档 png。`cargo tauri icon` 顺带吐出的 `ios/`、
+`android/`、`Square*Logo.png`、`StoreLogo.png` 这个桌面项目用不到（`tauri.conf.json`
+里也没引），删掉了。
+
+- **托盘图标改成单色模板**（`src/tray_icon.rs`）：18pt 的菜单栏里彩色 App 图标会糊成一块色，
+  模板图让系统按菜单栏明暗自己上色。形状直接在内存里画（圆环 + 中心点，缺口朝左上），
+  不引 PNG 解码：`tauri` 的 `image-png` feature 会把整个 `image` crate 拖进来，
+  为一张 36×36 的小图不值当。纯函数 + 4 个单测钉住形状。
+  Windows / Linux 的托盘没有 template 机制，黑白的模板图在深色任务栏上等于隐形，
+  那两边继续用彩色 App 图标（`#[cfg]` 分开）。
+
+**真的装了一遍。** 挂载 `bundle/dmg/quota-panel_0.1.0_aarch64.dmg`，照 dmg 里那条
+`Applications -> /Applications` 软链把 `.app` 拷进 `/Applications`，旧的
+`~/Applications/quota-panel.app` 移进废纸篓；全程只有一个实例在跑。
+
+- 装完在**安装版**上重验了配置持久化（上面「当前状态」里有详细数据）。
+- 合成点击的一个坑，记下来省下一个人踩：`cliclick` 的 CGEvent 打不到这种没有
+  key window 的菜单栏小程序，多显示器下坐标空间还会错位；`osascript -e 'click at {x,y}'`
+  或者直接对无障碍元素发 `AXPress` 都能命中。界面文案也能直接读无障碍树
+  （`tmp/shots/axact.swift`），比截图量坐标稳。
+
+**清理。** 删掉约 93 MB 属于本项目的 `/tmp` 临时产物（截图、探针 json、日志、旧 `.app` 备份）；
+`lsregister -u` 注销了 5 条死注册（指向已卸载的 dmg 卷、`/private/tmp` 里的旧打包目录、
+废纸篓里的旧副本）；旧 identifier 的 WebKit 缓存目录移进了废纸篓。
+另外查了一遍「重复文案字典 / 重叠测试」：两份错误字典（`ui/index.html` 的 `ERROR_TEXT`
+与 `bin/quota.rs` 的 `error_text`）23 个 key 完全对齐，`scripts/check-ui.cjs` 已经把
+界面字典的语法 / 缺 key / 死代码都拦住了，63 个测试各司其职——**没找到可删的重复**。
+
 ## 未验证 / 已知缺口 ⚠️
 
 - ⚠️ **公开提交里的作者邮箱仍是真实 Gmail**（`liujufu019@gmail.com`，全部提交都是）。
@@ -204,12 +249,20 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
   现在能对上，厂商改协议就会静默读错值。
 - ⚠️ **Grok Bot 的分母未公开**，百分比只能看趋势（README 已如实写明）。
 - ✅ ~~配置没持久化~~ 2026-09-18 已解决（`6a55bd5`，见上面那一轮）。
-- ⚠️ **`.dmg` 只验证到「生成成功」**：没有真的挂载安装一遍，也没在干净用户下装过。
+- ✅ ~~`.dmg` 只验证到「生成成功」~~ 2026-09-18 晚真挂载装进了 `/Applications` 并在安装版上
+  跑完配置读写。**仍然没在干净用户 / 别人的机器上装过**：首次启动的权限弹窗、
+  没有登录态时的降级表现，只有在别人的机器上才看得到。
 - ✅ ~~identifier 以 `.app` 结尾~~ 已改成 `com.quotapanel.desktop`（tauri-cli 不再警告）。
   改 identifier 等于换了一个 App：登录项、系统隐私授权（比如桌面文件夹访问）
   可能要在系统设置里重新给一次。
-- ⚠️ **打包产物的写盘路径只按同一份代码推断**：设置页写盘是在 `target/release` 的 bin 上
-  实测的，`.app` 那份实测到「启动 / 展开 / 托盘存在」，没有在 bundle 里点一遍设置。
+- ⚠️ **装完没有配登录项**：改 identifier 之后旧的登录项失效了，要开机自启得在
+  「系统设置 → 通用 → 登录项」里手动加 `/Applications/quota-panel.app`。
+  这属于改用户机器的自启配置，没有替用户决定。
+- ✅ ~~打包产物的写盘路径只按同一份代码推断~~ 2026-09-18 晚在 `/Applications` 的
+  `.app` 里点了一遍设置页：读到磁盘上的值、改一个数字也真的写回
+  `~/Library/Application Support/com.quotapanel.desktop/config.json`。
+- ⚠️ **早期 Electron 原型的遗留还没清**：仓库根目录的 `node_modules/`（未跟踪）和
+  本机上一版的旧数据目录都还在。删之前先跟 Jules 确认——数据目录里可能有他还想留的东西。
 - ✅ **CI 已经在 GitHub 上跑绿了**（2026-09-17，commit `ede50ba`，run 35176866022）：
   `lint` + `test` 三个平台（ubuntu / windows / macos）**四个 job 全绿**。
   首次运行（`9411071`）lint 曾红过一次：Linux 上 `use std::process::Command`
@@ -228,9 +281,13 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 ## 下一步（还没做，供接手者选）
 
 1. ~~配置持久化~~ ✅ 2026-09-18 做完（`6a55bd5`）。
-2. ~~macOS 真机验证~~ ✅ 2026-09-18 做完；`.dmg` 想彻底收尾可以真挂载装一遍。
+2. ~~macOS 真机验证~~ ✅ 2026-09-18 做完。
 3. ~~换掉 identifier~~ ✅ 2026-09-18 改成 `com.quotapanel.desktop`。
-4. **作者邮箱**（见上面的 ⚠️）：换掉公开提交里的真实 Gmail 需要 Jules 亲自改写历史。
+4. ~~`.dmg` 真装一次~~ ✅ 2026-09-18 晚装进 `/Applications` 并重验了配置读写。
+5. ~~图标太丑~~ ✅ 2026-09-18 晚重做 App 图标 + 单色托盘模板。
+6. **作者邮箱**（见上面的 ⚠️）：换掉公开提交里的真实 Gmail 需要 Jules 亲自改写历史。
+7. **收尾杂项**：Electron 遗留（`node_modules/`、旧数据目录）、要不要配登录项、
+   要不要把图标母版的合成脚本从 `tmp/` 挪进仓库（现在是一次性脚本，重做图标时要重写）。
 
 ## 常用命令
 
