@@ -137,9 +137,9 @@ Three numbers in the settings panel. **One click applies and persists them** (th
 
 The file lives in the platform's app-config directory:
 
-- macOS: `~/Library/Application Support/com.quotapanel.app/config.json`
-- Windows: `%APPDATA%\com.quotapanel.app\config.json`
-- Linux: `~/.config/com.quotapanel.app/config.json`
+- macOS: `~/Library/Application Support/com.quotapanel.desktop/config.json`
+- Windows: `%APPDATA%\com.quotapanel.desktop\config.json`
+- Linux: `~/.config/com.quotapanel.desktop/config.json`
 
 It holds **these three numbers and nothing else — no credentials, ever** (credentials are read into
 memory for a single request and dropped). Delete the file to go back to the defaults. Hand-editing is

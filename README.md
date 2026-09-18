@@ -117,9 +117,9 @@ cargo build --release --bin quota    # 产物 target/release/quota(.exe)
 
 配置文件放在系统的应用配置目录下：
 
-- macOS：`~/Library/Application Support/com.quotapanel.app/config.json`
-- Windows：`%APPDATA%\com.quotapanel.app\config.json`
-- Linux：`~/.config/com.quotapanel.app/config.json`
+- macOS：`~/Library/Application Support/com.quotapanel.desktop/config.json`
+- Windows：`%APPDATA%\com.quotapanel.desktop\config.json`
+- Linux：`~/.config/com.quotapanel.desktop/config.json`
 
 里面**只有这三个数字，没有也不会有任何凭据**（凭据全程只在内存里用完即弃）。
 删掉它就回到默认值；手改也认，越界值（比如 0 分钟、危险阈值不高于警告阈值）会在读取时被夹回合法区间。

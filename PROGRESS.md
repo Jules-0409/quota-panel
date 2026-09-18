@@ -173,7 +173,7 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
   - `config.rs`：`load` / `save` / `sanitize` 三个纯函数 + 7 个单测（round-trip、缺文件、
     坏 JSON、越界夹取、危险线必须严格高于警告线、NaN 兜底、手改文件读时收敛）。
     落盘先写 `config.json.tmp` 再 rename，断电或磁盘满不会留下半截 JSON。
-  - 文件在 `app_config_dir()` 下（macOS 是 `~/Library/Application Support/com.quotapanel.app/`），
+  - 文件在 `app_config_dir()` 下（macOS 是 `~/Library/Application Support/com.quotapanel.desktop/`），
     **只有三个数字，没有凭据**（凭据仍然只在内存里用完即弃）。
   - `set_config` 先落盘再更新内存，写不进去就整条失败并回 `config.save_failed`
     （两份字典都加了），界面不会出现「显示已保存、重启又变回去」。
@@ -205,8 +205,9 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 - ⚠️ **Grok Bot 的分母未公开**，百分比只能看趋势（README 已如实写明）。
 - ✅ ~~配置没持久化~~ 2026-09-18 已解决（`6a55bd5`，见上面那一轮）。
 - ⚠️ **`.dmg` 只验证到「生成成功」**：没有真的挂载安装一遍，也没在干净用户下装过。
-- ⚠️ **identifier 还是 `com.quotapanel.app`**（以 `.app` 结尾），tauri-cli 会警告它和
-  bundle 后缀冲突。改它要同时迁配置目录和登录项，越晚越麻烦。
+- ✅ ~~identifier 以 `.app` 结尾~~ 已改成 `com.quotapanel.desktop`（tauri-cli 不再警告）。
+  改 identifier 等于换了一个 App：登录项、系统隐私授权（比如桌面文件夹访问）
+  可能要在系统设置里重新给一次。
 - ⚠️ **打包产物的写盘路径只按同一份代码推断**：设置页写盘是在 `target/release` 的 bin 上
   实测的，`.app` 那份实测到「启动 / 展开 / 托盘存在」，没有在 bundle 里点一遍设置。
 - ✅ **CI 已经在 GitHub 上跑绿了**（2026-09-17，commit `ede50ba`，run 35176866022）：
@@ -228,8 +229,7 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 
 1. ~~配置持久化~~ ✅ 2026-09-18 做完（`6a55bd5`）。
 2. ~~macOS 真机验证~~ ✅ 2026-09-18 做完；`.dmg` 想彻底收尾可以真挂载装一遍。
-3. **换掉 identifier**：`com.quotapanel.app` 去掉 `.app` 后缀，同时迁 `config.json`
-   的位置（两份 README 的「配置」一节要跟着改）。
+3. ~~换掉 identifier~~ ✅ 2026-09-18 改成 `com.quotapanel.desktop`。
 4. **作者邮箱**（见上面的 ⚠️）：换掉公开提交里的真实 Gmail 需要 Jules 亲自改写历史。
 
 ## 常用命令
