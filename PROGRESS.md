@@ -228,11 +228,17 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
   （`tmp/shots/axact.swift`），比截图量坐标稳。
 
 **清理。** 删掉约 93 MB 属于本项目的 `/tmp` 临时产物（截图、探针 json、日志、旧 `.app` 备份）；
-`lsregister -u` 注销了 5 条死注册（指向已卸载的 dmg 卷、`/private/tmp` 里的旧打包目录、
-废纸篓里的旧副本）；旧 identifier 的 WebKit 缓存目录移进了废纸篓。
+`lsregister -u` 注销掉一批死注册：4 个指向已卸载 dmg 卷的、`/private/tmp` 里旧打包目录的、
+废纸篓里旧副本的、还有两条指向已经不存在的 Electron bundle 路径；
+旧 identifier 的 WebKit 缓存目录、早期 Electron 原型的旧数据目录（`~/Library/Application
+Support/quota-panel`，里面还有旧格式的 `config.json`）都移进了废纸篓。
 另外查了一遍「重复文案字典 / 重叠测试」：两份错误字典（`ui/index.html` 的 `ERROR_TEXT`
 与 `bin/quota.rs` 的 `error_text`）23 个 key 完全对齐，`scripts/check-ui.cjs` 已经把
 界面字典的语法 / 缺 key / 死代码都拦住了，63 个测试各司其职——**没找到可删的重复**。
+
+**收尾。** 按 Jules 的要求把 `/Applications/quota-panel.app` 加进登录项（菜单栏程序，
+`hidden=false` 不占 Dock），两版 README 的「怎么用」里补了「开机自启」这一条。
+图标不再改，母版合成脚本是一次性草稿、留在 `tmp/` 没进仓库。
 
 ## 未验证 / 已知缺口 ⚠️
 
@@ -255,9 +261,10 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 - ✅ ~~identifier 以 `.app` 结尾~~ 已改成 `com.quotapanel.desktop`（tauri-cli 不再警告）。
   改 identifier 等于换了一个 App：登录项、系统隐私授权（比如桌面文件夹访问）
   可能要在系统设置里重新给一次。
-- ⚠️ **装完没有配登录项**：改 identifier 之后旧的登录项失效了，要开机自启得在
-  「系统设置 → 通用 → 登录项」里手动加 `/Applications/quota-panel.app`。
-  这属于改用户机器的自启配置，没有替用户决定。
+- ✅ ~~装完没有配登录项~~ 2026-09-18 晚按 Jules 的要求加上了：登录项里多了一条指向
+  `/Applications/quota-panel.app`（`hidden=false`）。走的是 System Events 那套登录项接口，
+  跟本机已有的 Clash / Grok Bot / Mos 同一机制；**只有下次登录才会真正被拉起**，
+  那天看一眼胶囊在不在就知道成没成。两版 README 的「怎么用」里也补了这条。
 - ✅ ~~打包产物的写盘路径只按同一份代码推断~~ 2026-09-18 晚在 `/Applications` 的
   `.app` 里点了一遍设置页：读到磁盘上的值、改一个数字也真的写回
   `~/Library/Application Support/com.quotapanel.desktop/config.json`。
@@ -286,8 +293,10 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 4. ~~`.dmg` 真装一次~~ ✅ 2026-09-18 晚装进 `/Applications` 并重验了配置读写。
 5. ~~图标太丑~~ ✅ 2026-09-18 晚重做 App 图标 + 单色托盘模板。
 6. **作者邮箱**（见上面的 ⚠️）：换掉公开提交里的真实 Gmail 需要 Jules 亲自改写历史。
-7. **收尾杂项**：Electron 遗留（`node_modules/`、旧数据目录）、要不要配登录项、
-   要不要把图标母版的合成脚本从 `tmp/` 挪进仓库（现在是一次性脚本，重做图标时要重写）。
+7. ~~收尾杂项~~ ✅ 2026-09-18 晚：Electron 原型的旧数据目录和死注册都清了，登录项也配上了。
+   图标不再改：母版的合成脚本（Apple 网格 + 透明底 + 投影）是一次性草稿，留在 `tmp/`
+   草稿区没进仓库；日后重新生成 `icon.icns` / `icon.ico` 只要对已提交的
+   `icons/app-icon-1024.png` 跑 `cargo tauri icon`。
 
 ## 常用命令
 

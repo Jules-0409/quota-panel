@@ -124,6 +124,8 @@ disables colour. Exit codes: `1` when every requested source failed, `2` for a b
 - Data refreshes **every 5 minutes** by default; the card footer shows the last update time.
 - **Language follows the OS**: a Chinese system locale renders the UI, the tray menu and all
   error messages in Chinese, anything else renders English. There is no in-app switch.
+- **Start at login**: add `/Applications/quota-panel.app` under System Settings → General →
+  Login Items. It is a menu bar app, so it takes no Dock icon.
 
 ## Configuration
 
