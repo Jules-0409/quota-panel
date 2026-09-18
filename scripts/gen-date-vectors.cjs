@@ -1,4 +1,4 @@
-// 一次性脚本：为 cursor.rs 的 parse_iso_to_unix 生成期望值（epoch 秒）。
+// 一次性脚本：为 cursor/time.rs 的 parse_iso_to_unix 生成期望值（epoch 秒）。
 // 手算月份/闰年容易出错，直接用 Date.parse 对照。
 const cases = [
   '2026-09-17T12:34:56Z',

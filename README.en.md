@@ -156,10 +156,10 @@ quota-panel-tauri/
 ├── src-tauri/
 │   ├── src/
 │   │   ├── lib.rs           # app entry, tray, background polling, 3-way concurrent scheduling
-│   │   ├── cursor.rs        # Cursor usage-summary + Grok Bot GetSandUsageStatus
+│   │   ├── cursor/          # Cursor usage-summary + Grok Bot GetSandUsageStatus
 │   │   ├── devin.rs         # Devin (protobuf over Connect-RPC)
 │   │   ├── factory.rs       # Factory / Droid
-│   │   ├── credentials.rs   # read-only local credential loading (incl. AES-GCM decryption)
+│   │   ├── credentials/     # read-only local credential loading (incl. AES-GCM decryption)
 │   │   ├── http.rs          # shared client UA + bounded retries
 │   │   ├── commands.rs      # Tauri IPC commands
 │   │   ├── models.rs        # data structures shared between backend and UI

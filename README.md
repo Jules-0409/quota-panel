@@ -133,10 +133,10 @@ quota-panel-tauri/
 ├── src-tauri/
 │   ├── src/
 │   │   ├── lib.rs           # 应用入口、托盘、后台轮询、三路并发的调度
-│   │   ├── cursor.rs        # Cursor usage-summary + Grok Bot 的 GetSandUsageStatus
+│   │   ├── cursor/          # Cursor usage-summary + Grok Bot 的 GetSandUsageStatus
 │   │   ├── devin.rs         # Devin（protobuf over Connect-RPC）
 │   │   ├── factory.rs       # Factory / Droid
-│   │   ├── credentials.rs   # 各客户端本地凭据的只读取用（含 AES-GCM 解密）
+│   │   ├── credentials/     # 各客户端本地凭据的只读取用（含 AES-GCM 解密）
 │   │   ├── http.rs          # 共享 client 的 UA 与有限次重试
 │   │   ├── commands.rs      # Tauri IPC 命令
 │   │   ├── models.rs        # 前后端共用的数据结构

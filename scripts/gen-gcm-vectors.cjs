@@ -1,5 +1,5 @@
 // 一次性脚本：用 Node 的 OpenSSL 实现生成 AES-256-GCM 测试向量。
-// 目的：Droid CLI 是 Node 写的，IV 是 16 字节，正是 credentials.rs 手搓 GCM 的原因。
+// 目的：Droid CLI 是 Node 写的，IV 是 16 字节，正是 credentials/gcm.rs 手搓 GCM 的原因。
 // 拿 Node 生成的密文去喂 Rust 解密，才能证明手搓实现和真实写出方一致。
 // 用完即弃，不要提交。
 const crypto = require('crypto');

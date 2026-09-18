@@ -126,8 +126,9 @@ const modelsRs = fs.readFileSync(
   path.join(__dirname, '..', 'quota-panel-tauri', 'src-tauri', 'src', 'models.rs'),
   'utf8'
 );
+// CursorQuota 拆分后在 cursor/mod.rs（这里只做字符串匹配，读它即可）
 const cursorRs = fs.readFileSync(
-  path.join(__dirname, '..', 'quota-panel-tauri', 'src-tauri', 'src', 'cursor.rs'),
+  path.join(__dirname, '..', 'quota-panel-tauri', 'src-tauri', 'src', 'cursor', 'mod.rs'),
   'utf8'
 );
 
@@ -152,7 +153,7 @@ for (const f of criticalFields) {
 
 // 契约源必须是 camelCase
 if (!/rename_all = "camelCase"/.test(modelsRs) || !/rename_all = "camelCase"/.test(cursorRs)) {
-  fail('models.rs 或 cursor.rs 缺少 rename_all = "camelCase"，前端字段名会对不上');
+  fail('models.rs 或 cursor/mod.rs 缺少 rename_all = "camelCase"，前端字段名会对不上');
 }
 
 // ---------- 7. 不该再出现的死代码 ----------
