@@ -214,7 +214,7 @@ pub fn load_factory_key() -> Result<Vec<u8>, String> {
                 }
             }
         }
-        return Err("Cannot find 32-byte Factory key in macOS Keychain".into());
+        Err("Cannot find 32-byte Factory key in macOS Keychain".into())
     }
 
     #[cfg(target_os = "windows")]
