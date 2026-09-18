@@ -27,6 +27,9 @@
   它内部保证「绝不新建文件」+ 降级时立刻 `PRAGMA query_only`。**不要绕过它直接
   `Connection::open`**。
 - **不写、不传、不缓存 token**。凭据只在内存里用完即弃，没有磁盘缓存。
+- **唯一允许落盘的是 `config.rs` 管的那份 `config.json`**（刷新间隔 + 两个颜色阈值，
+  见 README 的「配置」）。往这个文件里加字段之前先想清楚：凭据、token、账号、
+  任何只对某台机器有意义的东西，一律不进。
 - **User-Agent 如实报自己**（`http.rs` 的 `USER_AGENT`，有测试锁着）。
   2026-09-17 实测过：伪造 UA 没有任何功能收益，纯属白送服务条款违规。
   **不要为了「看起来像官方客户端」去改它。**
@@ -71,6 +74,10 @@ cd quota-panel-tauri/src-tauri
 cargo test --bins --lib
 cargo clippy --all-targets -- -D warnings
 ```
+
+改过 `ui/index.html` 还要跑一次 `node scripts/check-ui.cjs`（CI 的 `lint` 任务在跑同一个脚本）：
+它做语法检查、文案 key 缺失检查、前后端字段名契约检查，**改文案 dict 只改一份语言**之类的错
+只有它能拦住。
 
 **测试是真凭据的替代品**：这个项目的取数逻辑依赖本机登录态，
 CI 上跑不了真实接口，所以**纯函数必须有单元测试**——

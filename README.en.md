@@ -28,7 +28,7 @@ About Grok Bot: it is **a Cursor product**. Its weekly quota is served by Cursor
 the Cursor card rather than as a separate card.
 
 The pill only shows the **tightest percentage across all sources**, coloured by threshold
-(yellow at 70%, red at 90% by default; thresholds live in `AppConfig` in `models.rs`).
+(yellow at 70%, red at 90% by default; change the numbers in the panel's ⚙ settings).
 
 ## Devin: how the data gets here
 
@@ -38,8 +38,9 @@ Read this section first if the Devin panel is the one you care about.
   (`server.codeium.com/.../SeatManagementService/GetUserStatus`, protobuf over Connect-RPC)
   directly. There is **no local-cache fallback**: if the call fails, the card shows an explicit
   error instead of silently displaying stale numbers.
-- **Cadence.** Auto-refresh every 5 minutes, plus manual refresh via the ↻ button or the tray
-  menu (instant). It is polling, not a push feed, so values can be up to 5 minutes old.
+- **Cadence.** Auto-refresh every 5 minutes by default (configurable in ⚙), plus manual refresh via the
+  ↻ button or the tray menu (instant). It is polling, not a push feed, so values can be up to that
+  interval old.
 - **Prerequisite.** You must be logged into Devin Desktop (or the Devin CLI) on the same machine.
   The app reads the existing login token from `~/.config/devin/credentials.toml`,
   `~/.codeium/windsurf/credentials.toml` or Devin Desktop's `state.vscdb` — **read-only**,
@@ -116,16 +117,39 @@ disables colour. Exit codes: `1` when every requested source failed, `2` for a b
 - After launch a pill appears at the top of the screen with the tightest percentage and a status dot.
 - **Click the pill** to expand the card; **click ✕** at the card's top right to collapse it.
 - **↻ button**: refresh immediately.
+- **⚙ button**: opens the settings, where the refresh interval and the two colour thresholds are edited
+  (see "Configuration" below).
 - **Tray icon** (menu bar): left-click shows and focuses the window; the right-click menu has
   "Refresh quotas now" and "Quit Quota Panel".
 - Data refreshes **every 5 minutes** by default; the card footer shows the last update time.
 - **Language follows the OS**: a Chinese system locale renders the UI, the tray menu and all
   error messages in Chinese, anything else renders English. There is no in-app switch.
 
+## Configuration
+
+Three numbers in the settings panel. **One click applies and persists them** (there is no "Save" button):
+
+| Setting | Default | Range | Effect |
+| --- | --- | --- | --- |
+| Auto refresh | 5 min | 1–60 | how often the background poll runs |
+| Warning threshold | 70% | 1–99 | turn yellow at or above this value |
+| Danger threshold | 90% | 2–100 | turn red at or above this value; must stay strictly above the warning threshold |
+
+The file lives in the platform's app-config directory:
+
+- macOS: `~/Library/Application Support/com.quotapanel.app/config.json`
+- Windows: `%APPDATA%\com.quotapanel.app\config.json`
+- Linux: `~/.config/com.quotapanel.app/config.json`
+
+It holds **these three numbers and nothing else — no credentials, ever** (credentials are read into
+memory for a single request and dropped). Delete the file to go back to the defaults. Hand-editing is
+supported; out-of-range values (0 minutes, a danger threshold that is not above the warning one) are
+clamped back into range when the file is read.
+
+The CLI (`quota`) does not use this file: it always colours by the default thresholds.
+
 ## Known limitations
 
-- **No persisted configuration**: refresh interval and colour thresholds are hardcoded
-  (5 min / 70% / 90%); there is no config file and no settings UI — change the source to change them.
 - All endpoints are **unofficial internal APIs**; a vendor can change one at any time and that
   column will stop working. When that happens you get a concrete error, never fake data.
 - The macOS build enables `macOSPrivateApi` (required for the frameless transparent window),

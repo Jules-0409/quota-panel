@@ -148,6 +148,13 @@ impl Ctx {
         let zh = self.zh;
         let table: &[(&str, &str, &str)] = &[
             (
+                // CLI 不会去写配置文件（设置只在 GUI 里改），这条是为了
+                // 「后端能返回的每个 key 两份字典都收着」，免得以后漏翻
+                "config.save_failed",
+                "保存设置失败：写不进配置文件",
+                "failed to save the settings file",
+            ),
+            (
                 "cred.sqlite_open",
                 "无法只读打开本地 SQLite 凭据库",
                 "cannot open the local SQLite credential db read-only",

@@ -238,6 +238,47 @@
   .apple-btn-close:hover {
     background: rgba(255, 255, 255, 0.22);
   }
+  /* 设置页开着时，齿轮按钮保持高亮 */
+  .apple-btn.active {
+    background: rgba(255, 255, 255, 0.22);
+    color: var(--apple-label);
+  }
+
+  /* 设置页 */
+  .settings-list {
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  .settings-row {
+    display: flex; align-items: center; gap: 7px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 0.5px solid rgba(255, 255, 255, 0.04);
+    border-radius: 9px;
+    padding: 6px 8px;
+  }
+  .settings-label {
+    flex: 1;
+    font-size: 11px; color: var(--apple-secondary);
+  }
+  .settings-value {
+    min-width: 46px; text-align: right;
+    font-size: 12px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--apple-label);
+  }
+  .settings-step { width: 20px; height: 20px; }
+  .settings-step svg { width: 10px; height: 10px; }
+  .settings-note {
+    font-size: 9.5px; line-height: 1.45;
+    color: var(--apple-tertiary);
+    padding: 1px 2px 0;
+  }
+  .settings-status {
+    font-size: 9.5px; color: var(--apple-green);
+    opacity: 0; transition: opacity 0.2s;
+    padding: 0 2px;
+  }
+  .settings-status.show { opacity: 1; }
+  .settings-status.error { color: var(--apple-red); opacity: 1; }
 
   svg {
     width: 12px; height: 12px; display: block;
@@ -363,6 +404,10 @@
         <span class="title">用量监控</span>
         <span class="spacer" data-tauri-drag-region></span>
         
+        <!-- 设置 -->
+        <button class="apple-btn" id="btn-settings" title="设置">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.1 15a1.7 1.7 0 0 0 .4 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H2.9a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.3 7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.4h.1A1.7 1.7 0 0 0 10.2 3v-.1a2 2 0 1 1 4 0V3a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.2a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1.1z" /></svg>
+        </button>
         <!-- 刷新 -->
         <button class="apple-btn" id="btn-refresh" title="立即刷新">
           <svg viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" /><path d="M20.5 4.2v5h-5" /></svg>
@@ -405,6 +450,16 @@ const api = {
     if (invoke) return await invoke('get_config');
     return { refreshMinutes: 5, warnPercent: 70, dangerPercent: 90 };
   },
+  // 设置直接落盘，返回后端收敛后的值；失败返回 null（错误 key 交给调用方翻译）
+  async setConfig(config) {
+    if (!invoke) return config;
+    try {
+      return await invoke('set_config', { config });
+    } catch (e) {
+      console.warn('set_config failed', e);
+      return null;
+    }
+  },
   async resize(width, height) {
     if (invoke) {
       try {
@@ -444,6 +499,7 @@ const dotHead = document.getElementById('dot-head');
 const updatedEl = document.getElementById('updated');
 const refreshHint = document.getElementById('refresh-hint');
 const btnRefresh = document.getElementById('btn-refresh');
+const btnSettings = document.getElementById('btn-settings');
 const btnCloseCard = document.getElementById('btn-close-card');
 
 // 界面语言跟随系统：中文系统显示中文，其余显示英文。
@@ -453,6 +509,7 @@ const TEXT = {
   zh: {
     'app.title': '用量监控', 'pill.title': '点击展开详细用量看板',
     'btn.refresh': '立即刷新', 'btn.close': '收起为胶囊',
+    'btn.settings': '设置', 'btn.decrease': '减少', 'btn.increase': '增加',
     'loading.pill': '读取中…', 'loading.board': '正在同步用量…',
     'footer.updated': '更新于 {0}', 'footer.auto': '{0}m 自动更新',
     'empty': '暂无数据', 'card.read_failed': '读取失败', 'unknown': '未知错误',
@@ -468,10 +525,14 @@ const TEXT = {
     'cursor.remaining': '剩余 {0}%', 'cursor.footer_failed': 'Cursor 额度读取失败',
     'total.prefix': '综合用量: ',
     'grok.exhausted': '额度已耗尽', 'grok.read_failed': 'Grok 读取失败', 'grok.weekly': '周周期',
+    'settings.refresh': '自动刷新间隔', 'settings.warn': '警告阈值', 'settings.danger': '危险阈值',
+    'settings.minutes': '{0} 分钟', 'settings.saved': '已保存',
+    'settings.note': '阈值只影响颜色。设置存在本机配置文件里，不写入任何凭据。',
   },
   en: {
     'app.title': 'Quota Monitor', 'pill.title': 'Click to expand the usage board',
     'btn.refresh': 'Refresh now', 'btn.close': 'Collapse to pill',
+    'btn.settings': 'Settings', 'btn.decrease': 'Decrease', 'btn.increase': 'Increase',
     'loading.pill': 'Loading…', 'loading.board': 'Syncing usage…',
     'footer.updated': 'Updated {0}', 'footer.auto': '{0}m auto refresh',
     'empty': 'No data yet', 'card.read_failed': 'Read failed', 'unknown': 'unknown error',
@@ -487,6 +548,9 @@ const TEXT = {
     'cursor.remaining': '{0}% left', 'cursor.footer_failed': 'Cursor quota read failed',
     'total.prefix': 'Combined: ',
     'grok.exhausted': 'quota exhausted', 'grok.read_failed': 'Grok read failed', 'grok.weekly': 'weekly cycle',
+    'settings.refresh': 'Auto refresh', 'settings.warn': 'Warning color at', 'settings.danger': 'Danger color at',
+    'settings.minutes': '{0} min', 'settings.saved': 'Saved',
+    'settings.note': 'Thresholds only change the colors. Settings live in a local file; no credentials are written.',
   },
 };
 function t(key, ...args) {
@@ -519,6 +583,7 @@ const ERROR_TEXT = {
     'devin.request_failed': '网络请求失败',
     'devin.http_status': 'Devin 接口返回异常状态',
     'devin.body_read_failed': '读取 Devin 响应失败',
+    'config.save_failed': '保存设置失败：写不进配置文件',
   },
   en: {
     'cred.sqlite_open': 'cannot open the local SQLite credential db read-only',
@@ -543,6 +608,7 @@ const ERROR_TEXT = {
     'devin.request_failed': 'network request failed',
     'devin.http_status': 'Devin API returned an error status',
     'devin.body_read_failed': 'failed to read the Devin response',
+    'config.save_failed': 'failed to save the settings file',
   },
 };
 function localizeError(raw) {
@@ -568,6 +634,7 @@ function applyStaticText() {
   if (headTitle) headTitle.textContent = t('app.title');
   pillEl.title = t('pill.title');
   btnRefresh.title = t('btn.refresh');
+  btnSettings.title = t('btn.settings');
   btnCloseCard.title = t('btn.close');
   const pillLoading = pillStats.querySelector('span');
   if (pillLoading) pillLoading.textContent = t('loading.pill');
@@ -581,6 +648,10 @@ let cfg = { warnPercent: 70, dangerPercent: 90 };
 let lastResults = null;
 let collapseTimer = null;
 let isCollapsing = false;
+let settingsOpen = false;
+// 最近一次保存成功的设置：payload 里的 config 是取数那一刻的快照，
+// 刚改过设置时以这份为准（后端已经落盘接受了，下一次取数就同步）
+let lastSavedCfg = null;
 
 function setMode(mode) {
   if (panelEl.dataset.mode === mode) { reportSize(); return; }
@@ -628,6 +699,128 @@ btnRefresh.addEventListener('click', async () => {
   btnRefresh.classList.add('spinning');
   await api.refresh();
   btnRefresh.classList.remove('spinning');
+});
+
+// ---------- 设置页 ----------
+// 三个数字点一下就立刻落盘，没有「保存」按钮：不用管未保存状态，收起面板也不会丢。
+// 回显一律用后端返回的收敛值（越界、danger <= warn 都在后端兜着），
+// 所以界面上显示的一定是真正生效的值。
+const REFRESH_STEP = 1;
+const PERCENT_STEP = 5;
+// 和后端 config.rs 的区间保持一致；前端先夹一次是为了按钮手感，后端还会再夹一次
+const REFRESH_RANGE = [1, 60];
+const WARN_RANGE = [1, 99];
+const DANGER_RANGE = [2, 100];
+
+let savedFlashTimer = null;
+const clampNum = (v, [lo, hi]) => Math.min(hi, Math.max(lo, v));
+
+function stepButton(dir, onClick) {
+  const b = document.createElement('button');
+  b.className = 'apple-btn settings-step';
+  b.title = t(dir < 0 ? 'btn.decrease' : 'btn.increase');
+  b.innerHTML = dir < 0
+    ? '<svg viewBox="0 0 24 24"><path d="M5 12h14" /></svg>'
+    : '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>';
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+function settingsRow(labelKey, valueText, onStep) {
+  const row = document.createElement('div');
+  row.className = 'settings-row';
+  const label = document.createElement('span');
+  label.className = 'settings-label';
+  label.textContent = t(labelKey);
+  const value = document.createElement('span');
+  value.className = 'settings-value';
+  value.textContent = valueText;
+  row.append(label, stepButton(-1, () => onStep(-1)), value, stepButton(1, () => onStep(1)));
+  return row;
+}
+
+function showSettingsStatus(text, isError) {
+  const el = document.getElementById('settings-status');
+  if (!el) return;
+  clearTimeout(savedFlashTimer);
+  el.textContent = text;
+  el.classList.toggle('error', !!isError);
+  el.classList.add('show');
+  if (!isError) savedFlashTimer = setTimeout(() => el.classList.remove('show'), 1500);
+}
+
+function renderSettings() {
+  const list = document.createElement('div');
+  list.className = 'settings-list';
+
+  const minutes = cfg.refreshMinutes ?? 5;
+  list.appendChild(settingsRow('settings.refresh', t('settings.minutes', minutes), (dir) =>
+    applyConfig({ refreshMinutes: clampNum(minutes + dir * REFRESH_STEP, REFRESH_RANGE) })));
+
+  const warn = Math.round(cfg.warnPercent ?? 70);
+  list.appendChild(settingsRow('settings.warn', `${warn}%`, (dir) =>
+    applyConfig({ warnPercent: clampNum(warn + dir * PERCENT_STEP, WARN_RANGE) })));
+
+  const danger = Math.round(cfg.dangerPercent ?? 90);
+  list.appendChild(settingsRow('settings.danger', `${danger}%`, (dir) =>
+    applyConfig({ dangerPercent: clampNum(danger + dir * PERCENT_STEP, DANGER_RANGE) })));
+
+  const note = document.createElement('div');
+  note.className = 'settings-note';
+  note.textContent = t('settings.note');
+
+  const status = document.createElement('div');
+  status.className = 'settings-status';
+  status.id = 'settings-status';
+
+  list.append(note, status);
+  content.textContent = '';
+  content.appendChild(list);
+  reportSize();
+}
+
+async function applyConfig(patch) {
+  const saved = await api.setConfig({
+    refreshMinutes: cfg.refreshMinutes ?? 5,
+    warnPercent: cfg.warnPercent ?? 70,
+    dangerPercent: cfg.dangerPercent ?? 90,
+    ...patch,
+  });
+  if (!saved) {
+    showSettingsStatus(localizeError('config.save_failed'), true);
+    return;
+  }
+
+  lastSavedCfg = saved;
+  cfg = { ...cfg, ...saved };
+  refreshHint.textContent = t('footer.auto', cfg.refreshMinutes);
+
+  if (settingsOpen) renderSettings();
+  else if (lastResults) render(lastResults);
+  showSettingsStatus(t('settings.saved'), false);
+}
+
+function openSettings() {
+  settingsOpen = true;
+  btnSettings.classList.add('active');
+  // 设置页里没有「刷新」的语义，先藏掉，免得点了没反应
+  btnRefresh.style.display = 'none';
+  renderSettings();
+}
+
+function closeSettings() {
+  settingsOpen = false;
+  btnSettings.classList.remove('active');
+  btnRefresh.style.display = '';
+  // 还没取到数就退回空态（render 自己会渲染「暂无数据」）
+  render(lastResults || {});
+  reportSize();
+}
+
+btnSettings.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (settingsOpen) closeSettings();
+  else openSettings();
 });
 
 function severity(used) {
@@ -980,11 +1173,23 @@ function worstSeverity(results) {
   return worst;
 }
 
+// 胶囊 / 状态点 / 更新时间：和卡片要不要重画无关。
+// 设置页开着时卡片不重画，但这三样必须照常更新。
+function renderStatusBits(results, at) {
+  const worst = worstSeverity(results);
+  dotPill.className = 'dot ' + worst;
+  dotHead.className = 'dot ' + worst;
+  renderPill(results);
+  if (at) updatedEl.textContent = t('footer.updated', new Date(at).toLocaleTimeString());
+}
+
 function render(payload) {
   lastResults = payload;
   tickers = [];
   const { results, config, at } = payload;
-  if (config) cfg = { ...cfg, ...config };
+  // payload 里的 config 是取数那一刻的快照；用户在那之后改过设置的话以后者为准
+  // （后端已经落盘接受了，下一次取数就同步）
+  if (config) cfg = { ...cfg, ...config, ...(lastSavedCfg || {}) };
   content.textContent = '';
 
   if (!results) {
@@ -1009,6 +1214,15 @@ api.onRefreshStart(() => btnRefresh.classList.add('spinning'));
 api.onUpdate((payload) => {
   btnRefresh.classList.remove('spinning');
   if (lastResults && JSON.stringify(lastResults.results) === JSON.stringify(payload.results)) return;
+  lastResults = payload;
+
+  // 设置页开着的时候来新数据：只更新胶囊和状态点，别把设置页顶掉
+  if (settingsOpen) {
+    cfg = { ...cfg, ...(payload.config || {}), ...(lastSavedCfg || {}) };
+    renderStatusBits(lastResults.results, payload.at);
+    return;
+  }
+
   render(payload);
   reportSize();
 });

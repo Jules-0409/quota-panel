@@ -5,6 +5,9 @@ description = "Lightweight cross-platform quota panel for Factory, Devin, Cursor
 license = "Apache-2.0"
 repository = "https://github.com/Jules-0409/quota-panel"
 edition = "2021"
+# 本 crate 有两个 bin，不指定主程序的话 `cargo tauri build` 直接报
+# 「failed to find main binary」；`cargo run` 不加 --bin 时也靠它选对。
+default-run = "quota-panel-tauri"
 
 [lib]
 name = "quota_panel_lib"

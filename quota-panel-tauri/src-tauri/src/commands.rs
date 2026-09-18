@@ -34,6 +34,34 @@ pub async fn get_config(state: State<'_, Arc<AppState>>) -> Result<AppConfig, St
     Ok(guard.clone())
 }
 
+/// 保存设置（刷新间隔 + 两个颜色阈值）。
+///
+/// 先落盘再更新内存：写不进去就整体失败，免得界面显示「已保存」而下次启动又变回去。
+/// 返回的是**收敛后**的配置，界面拿它回显，看到的一定是真正生效的值。
+#[tauri::command]
+pub async fn set_config(
+    state: State<'_, Arc<AppState>>,
+    config: AppConfig,
+) -> Result<AppConfig, String> {
+    let next = crate::config::sanitize(config);
+
+    if let Some(path) = state.config_path.as_deref() {
+        crate::config::save(path, &next).map_err(|e| {
+            eprintln!("config: 写入 {} 失败: {e}", path.display());
+            "config.save_failed".to_string()
+        })?;
+    }
+
+    {
+        let mut guard = state.config.lock().await;
+        *guard = next.clone();
+    }
+    // 叫醒轮询循环：新的刷新间隔立刻开始计时
+    state.config_changed.notify_one();
+
+    Ok(next)
+}
+
 #[tauri::command]
 pub async fn set_locale(
     app: AppHandle,

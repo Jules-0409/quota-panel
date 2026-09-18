@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod config;
 pub mod credentials;
 pub mod cursor;
 pub mod devin;
@@ -6,6 +7,7 @@ pub mod factory;
 pub mod http;
 pub mod models;
 
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{
@@ -20,6 +22,12 @@ use crate::models::{AppConfig, QuotaPayload, QuotaResults};
 pub struct AppState {
     pub cached_quota: Mutex<Option<QuotaPayload>>,
     pub config: Mutex<AppConfig>,
+    /// 配置文件的落盘位置。拿不到应用配置目录时为 None：
+    /// 这时设置只在内存里生效（重启回默认），不能因此起不来。
+    pub config_path: Option<PathBuf>,
+    /// 设置改动后叫醒轮询循环，让新的刷新间隔马上开始计时，
+    /// 而不是等这一轮旧的 sleep 睡完（改间隔是用户能直接感知的操作）
+    pub config_changed: tokio::sync::Notify,
     /// 界面语言，启动时由 UI 按 navigator.language 上报（set_locale）。
     /// 后端错误一律发语言无关的 key，翻译在 UI 做；这里只影响托盘菜单文案。
     pub locale: Mutex<String>,
@@ -130,25 +138,38 @@ pub fn run() {
         .build()
         .unwrap_or_default();
 
-    let state = Arc::new(AppState {
-        cached_quota: Mutex::new(None),
-        config: Mutex::new(AppConfig::default()),
-        locale: Mutex::new("en".into()),
-        client: http_client,
-    });
-
-    let state_for_setup = state.clone();
-
     tauri::Builder::default()
-        .manage(state)
         .invoke_handler(tauri::generate_handler![
             commands::get_quota,
             commands::refresh_quota,
             commands::get_config,
+            commands::set_config,
             commands::resize_window,
             commands::set_locale
         ])
         .setup(move |app| {
+            // 状态建在这里而不是外面：配置文件的目录要拿到 AppHandle 才问得出来。
+            // 问不出来（权限异常等）就退化成「只在内存里生效」，不影响启动。
+            let config_path = app
+                .path()
+                .app_config_dir()
+                .ok()
+                .map(|dir| crate::config::config_path(&dir));
+            let config = config_path
+                .as_deref()
+                .map(crate::config::load)
+                .unwrap_or_default();
+
+            let state = Arc::new(AppState {
+                cached_quota: Mutex::new(None),
+                config: Mutex::new(config),
+                config_path,
+                config_changed: tokio::sync::Notify::new(),
+                locale: Mutex::new("en".into()),
+                client: http_client.clone(),
+            });
+            app.manage(state.clone());
+
             // Setup system tray menu（初始英文，UI 启动后按系统语言 set_locale 重建）
             let menu = build_tray_menu(app.handle(), "en")?;
 
@@ -163,7 +184,7 @@ pub fn run() {
                 tray_builder = tray_builder.icon(ic);
             }
 
-            let state_for_tray = state_for_setup.clone();
+            let state_for_tray = state.clone();
 
             tray_builder
                 .on_menu_event(move |app, event| match event.id.as_ref() {
@@ -197,7 +218,7 @@ pub fn run() {
 
             // 后台轮询：间隔取自配置 AppConfig::refresh_minutes（默认 5 分钟）
             let app_handle_for_poll = app.handle().clone();
-            let state_for_poll = state_for_setup.clone();
+            let state_for_poll = state.clone();
 
             tauri::async_runtime::spawn(async move {
                 // Initial fetch
@@ -211,15 +232,25 @@ pub fn run() {
                     };
                     // 至少 1 分钟：refresh_minutes 为 0 时不能变成打接口的死循环
                     let delay_secs = refresh_minutes.max(1).saturating_mul(60);
-                    tokio::time::sleep(std::time::Duration::from_secs(delay_secs)).await;
+                    tokio::select! {
+                        _ = tokio::time::sleep(std::time::Duration::from_secs(delay_secs)) => {}
+                        // 设置里改了间隔：重新计时，不用把旧的（可能很长的）间隔睡完
+                        _ = state_for_poll.config_changed.notified() => continue,
+                    }
                     let _ = do_refresh(&app_handle_for_poll, &state_for_poll).await;
                 }
             });
 
             // Configure macOS window behavior
             #[cfg(target_os = "macos")]
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.set_always_on_top(true);
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_always_on_top(true);
+                }
+                // 常驻托盘的小组件不该出现在 Dock 和 Cmd-Tab 里。手搓的 .app 靠
+                // Info.plist 的 LSUIElement 做到，`cargo tauri build` 生成的 plist
+                // 没有这一项，所以在这里钉死，两条打包路径的观感才一致。
+                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
 
             Ok(())
