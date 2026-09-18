@@ -12,11 +12,23 @@
 **可用。** 三个数据源（Factory / Devin / Cursor 含 Grok Bot）在本机实测
 都能取到数，`quota` CLI 和 GUI 共用同一套 fetcher。
 
-- 工作树干净；`main` 与 `origin/main` 同步于 `7c23bf9`（本轮从 `affb83c`
-  一路走到这里，全部已推送）。
+- 工作树干净。`origin/main` 在 `de12d7b`（那批已推送、CI 绿）；本地 `main` 比它多出
+  2026-09-18 的提交（配置持久化 `6a55bd5` + 这次的 PROGRESS 记录），**等推送授权**。
 - 2026-09-17 推送的那批提交修掉了下面记录的 3 个 bug、补上了测试和 CI。
   **`c424ac5` 及更早的版本没有这些修复。**
 - 推送经过当次明确授权；以后每次推送仍要重新获得授权。
+
+最近一次实跑验证（2026-09-18，macOS + 真实登录态）：
+
+- `cargo test --bins --lib` → **59 passed, 0 failed**（43 lib + 16 bin；配置那几个单测是新增的）
+- `cargo clippy --all-targets -- -D warnings` → 通过，无 warning；`cargo fmt --check` → 通过
+- `node scripts/check-ui.cjs` → 通过（TEXT 49 key × 2 语言，ERROR_TEXT 23 key × 2 语言）
+- `./target/release/quota`（真接口）→ 三个数据源都有数，中英输出都干净，退出码 0
+- GUI 实跑 + 截图核对：胶囊 / 展开面板 / 右边缘贴边锚定 / 托盘图标与菜单 / ⚙ 设置页
+- 配置持久化实测：手写 `config.json` 启动后按新阈值上色；设置页的 +/- 真的写盘
+  （「危险 −」被后端从 15 夹到 16）
+- `cargo tauri build` → `.app` + `.dmg` 都出得来；打出来的 `.app` 实跑正常
+  （`lsappinfo` 显示 `UIElement`，不进 Dock）
 
 上一次实跑验证（2026-09-17，Windows + 真实登录态）：
 
@@ -88,6 +100,14 @@ affb83c Drop a redundant `return` in `load_factory_key`
 也一起清了。CI 已在 `7c23bf9` 跑绿（run 35292810278，`lint` + ubuntu /
 windows / macos 三个 `test` job）。
 
+再之后（2026-09-18，macOS 机器，**本地提交，等推送授权**）：
+
+```
+6a55bd5 Persist the refresh interval and thresholds, and fix `cargo tauri build`
+```
+
+`6a55bd5` 就是下面那一轮的成果：配置持久化 + 让 `cargo tauri build` 真正能跑。
+
 本轮之前的：
 
 ```
@@ -139,6 +159,36 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
   重试判定与退避表、前后端 camelCase 契约、CLI 格式化与双语输出。
 - **补文档**：本文件 + `AGENTS.md` + `.gitignore` 加 `tmp/`。
 
+## 最近做完的（2026-09-18 这一轮）
+
+- ✅ **macOS 真机验证（CLI）**：`./target/release/quota` 在这台机器上实跑，Factory（Keychain +
+  手搓 GCM）、Devin（手写 protobuf）、Cursor + Grok Bot 三路都拿到了真数据，中英输出都干净、
+  退出码 0。上面那条「macOS 侧没跑过真接口」的 ⚠️ 由此收尾。
+- ✅ **macOS 真机验证（GUI）**：胶囊 → 展开面板（三张卡片，数字与 CLI 一致）→
+  右边缘贴边锚定（`(544,236,290,33)` → `(465,236,369,559)`，右边缘固定 834）→
+  托盘图标在菜单栏可见、点开是「立即刷新额度 / 退出 Quota Panel」→ ⚙ 设置页，逐项截图核对过。
+- ✅ **进度条颜色复核**：Devin 那两根 61% / 67% 的条取色是 `#34c759`（= `--apple-green`），
+  阈值 70/90 下判绿正确；之前怀疑「该绿却发黄」是缩略图上的错觉。
+- ✅ **配置持久化**（`6a55bd5`，README 已知限制第一条已删）：
+  - `config.rs`：`load` / `save` / `sanitize` 三个纯函数 + 7 个单测（round-trip、缺文件、
+    坏 JSON、越界夹取、危险线必须严格高于警告线、NaN 兜底、手改文件读时收敛）。
+    落盘先写 `config.json.tmp` 再 rename，断电或磁盘满不会留下半截 JSON。
+  - 文件在 `app_config_dir()` 下（macOS 是 `~/Library/Application Support/com.quotapanel.app/`），
+    **只有三个数字，没有凭据**（凭据仍然只在内存里用完即弃）。
+  - `set_config` 先落盘再更新内存，写不进去就整条失败并回 `config.save_failed`
+    （两份字典都加了），界面不会出现「显示已保存、重启又变回去」。
+  - `AppState` 改到 `setup` 里建（要 `AppHandle` 才知道配置目录），轮询循环改成
+    `select!` 等 `config_changed`，改完间隔立刻重新计时。
+  - UI 加了 ⚙ 设置页（三个 +/- 步进，点一下立刻写盘），中英两套文案，`check-ui.cjs` 跟着过。
+  - **实测**：手写 `{15, 10, 20}` → 启动后卡片按新阈值上色、页脚显示「15m 自动更新」；
+    设置页点「警告 +」写盘 `warnPercent: 15.0`，点「危险 −」被后端夹成 `16.0`。
+- ✅ **`cargo tauri build` 跑通**（同一提交）：本 crate 有两个 bin 且没有 `default-run`，
+  tauri-cli 直接报 `failed to find main binary`；加上 `default-run = "quota-panel-tauri"`
+  后 `.app` 和 `.dmg` 都能出（`target/release/bundle/`）。另外 `cargo tauri build`
+  生成的 Info.plist 没有 `LSUIElement`，Dock 里会多一个图标，于是在代码里设了
+  `ActivationPolicy::Accessory`，`lsappinfo` 实测从 `Foreground` 变 `UIElement`，
+  手搓的和 tauri-cli 打的两种 `.app` 观感一致。
+
 ## 未验证 / 已知缺口 ⚠️
 
 - ⚠️ **公开提交里的作者邮箱仍是真实 Gmail**（`liujufu019@gmail.com`，全部提交都是）。
@@ -146,17 +196,19 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
   想换成 GitHub 私密邮箱 `284996397+Jules-0409@users.noreply.github.com` 需要改写全部历史
   并强推，这属于改 Git 身份，Droid 的规则不允许它自己动手，要 Jules 亲自跑。
   现成脚本：`tmp/rewrite-emails.ps1`（含备份与指纹核对，跑完可由 Droid 核对并强推）。
-- ⚠️ **macOS 侧没跑过真接口**。写这份记录时用的机器是 Windows。
-  `credentials/keyring.rs` 的 Keychain 分支、`cursor/auth.rs` 的 `security` 回退、
-  `lib.rs` 的 macOS 私有 API 窗口行为 **都还没在有真实登录态的 macOS 上验证**
-  （macOS 上跑过的是单元测试，见上面拆模块那一段）。跨平台改动要特别小心。
-- ⚠️ **`quota-panel-tauri` 主程序（GUI）本轮没重新实跑**，只跑了 CLI 和测试。
-  界面改的是「删掉 stale 徽章」，风险低，但透明窗口的问题靠日志发现不了，
-  **下次动 UI 前应先 `cargo run` 看一眼，或至少渲染一次 `scripts/make-ui-preview.cjs`**。
+- ✅ ~~macOS 侧没跑过真接口~~ 2026-09-18 已实跑并核对（见上面那一轮）：Keychain 分支、
+  `security` 回退、`lib.rs` 的 macOS 私有 API 窗口行为都在有真实登录态的机器上验过。
+- ✅ ~~`quota-panel-tauri` 主程序（GUI）本轮没重新实跑~~ 2026-09-18 已实跑（胶囊 / 展开面板 /
+  贴边锚定 / 托盘菜单 / 设置页）。改 UI 仍然要实际渲染一次再提交：透明窗口的坑靠日志发现不了。
 - ⚠️ **Devin 的 protobuf 字段号是猜的**（见 `AGENTS.md` 的「改契约 / 接口时」一节）。
   现在能对上，厂商改协议就会静默读错值。
 - ⚠️ **Grok Bot 的分母未公开**，百分比只能看趋势（README 已如实写明）。
-- ⚠️ **配置没持久化**：刷新间隔和阈值还写死在代码里。
+- ✅ ~~配置没持久化~~ 2026-09-18 已解决（`6a55bd5`，见上面那一轮）。
+- ⚠️ **`.dmg` 只验证到「生成成功」**：没有真的挂载安装一遍，也没在干净用户下装过。
+- ⚠️ **identifier 还是 `com.quotapanel.app`**（以 `.app` 结尾），tauri-cli 会警告它和
+  bundle 后缀冲突。改它要同时迁配置目录和登录项，越晚越麻烦。
+- ⚠️ **打包产物的写盘路径只按同一份代码推断**：设置页写盘是在 `target/release` 的 bin 上
+  实测的，`.app` 那份实测到「启动 / 展开 / 托盘存在」，没有在 bundle 里点一遍设置。
 - ✅ **CI 已经在 GitHub 上跑绿了**（2026-09-17，commit `ede50ba`，run 35176866022）：
   `lint` + `test` 三个平台（ubuntu / windows / macos）**四个 job 全绿**。
   首次运行（`9411071`）lint 曾红过一次：Linux 上 `use std::process::Command`
@@ -174,11 +226,11 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 
 ## 下一步（还没做，供接手者选）
 
-1. **配置持久化**：刷新间隔 / 阈值写进配置文件 + 一个设置界面，
-   解决 README「已知限制」第一条。
-2. **macOS 真机验证**：在真实 macOS 机器上构建并实跑，确认
-   Keychain 分支、`.app` 打包、无边框窗口行为。
-   （CI 已在 macOS runner 上编译并跑通测试，但那不等于真机上跑得起来。）
+1. ~~配置持久化~~ ✅ 2026-09-18 做完（`6a55bd5`）。
+2. ~~macOS 真机验证~~ ✅ 2026-09-18 做完；`.dmg` 想彻底收尾可以真挂载装一遍。
+3. **换掉 identifier**：`com.quotapanel.app` 去掉 `.app` 后缀，同时迁 `config.json`
+   的位置（两份 README 的「配置」一节要跟着改）。
+4. **作者邮箱**（见上面的 ⚠️）：换掉公开提交里的真实 Gmail 需要 Jules 亲自改写历史。
 
 ## 常用命令
 
