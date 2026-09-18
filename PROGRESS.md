@@ -12,7 +12,8 @@
 **可用。** 三个数据源（Factory / Devin / Cursor 含 Grok Bot）在本机实测
 都能取到数，`quota` CLI 和 GUI 共用同一套 fetcher。
 
-- 工作树干净，`main` 与 `origin/main` 同步于 `ed407e0`。
+- 工作树干净；`main` 与 `origin/main` 同步于 `affb83c`，之后有两笔本地提交
+  （`5b49365` 拆模块 + 本次记录），**未推送**。
 - 2026-09-17 推送的那批提交修掉了下面记录的 3 个 bug、补上了测试和 CI。
   **`c424ac5` 及更早的版本没有这些修复。**
 - 推送经过当次明确授权；以后每次推送仍要重新获得授权。
@@ -32,6 +33,12 @@
   「无数据」和「额度已耗尽」两个分支都正常
 - GitHub Actions 真跑过：四个 job 全绿（`ed407e0`，run 35182960691，
   含新加的 `cargo fmt --check` 步骤）
+
+拆分之后又在 macOS 本机跑过（2026-09-17 晚；只跑测试，没有碰真接口）：
+
+- `cargo test --bins --lib` → **52 passed, 0 failed**（与拆分前一致）
+- `cargo clippy --all-targets -- -D warnings` → 通过，无 warning
+- `cargo fmt --check` → 通过
 
 ## 提交记录
 
@@ -60,6 +67,18 @@ b2a468f Make the docs machine-agnostic
 和内网说明，补了一张假数据截图，把 rustfmt 补齐并把 `cargo fmt --check`
 加进 CI。仓库简介和 topics 也已设置。
 
+再之后（2026-09-17 晚，从 macOS 机器上提交）：
+
+```
+affb83c Drop a redundant `return` in `load_factory_key`（已推送）
+5b49365 Split `credentials.rs` and `cursor.rs` into module directories（本地，未推送）
+```
+
+`5b49365` 是纯搬迁：`credentials.rs` 拆成 `credentials/`（6 个文件）、
+`cursor.rs` 拆成 `cursor/`（5 个文件），公开路径（`crate::credentials::*`、
+`crate::cursor::*`）不变，52 个测试一个不少。这就是 AGENTS.md 里
+「文件超 400 行就优先拆」那条。
+
 本轮之前的：
 
 ```
@@ -77,7 +96,7 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 
 ### 抓到的 bug（都有回归测试钉住）
 
-1. **日期解析算错半年**（`cursor.rs:parse_iso_to_unix`）
+1. **日期解析算错半年**（`cursor/time.rs:parse_iso_to_unix`，拆分前在 `cursor.rs`）
    `(153 * (m + 9) % 12 + 2) / 5` 里，Rust 的 `*` 和 `%` 同优先级且左结合，
    实际被解析成 `(153 * (m + 9)) % 12`，月份贡献全错（9 月算成 6）。
    影响：Cursor 账期重置时间、Grok 重置时间全部偏移约半年。
@@ -85,7 +104,7 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
    修后与 Node `Date.parse` 逐秒一致。
    修法：显式加括号 `153 * ((m + 9) % 12)`。
 
-2. **GCM 解不开 ≥32 字节的 IV**（`credentials.rs:decrypt_factory_payload`）
+2. **GCM 解不开 ≥32 字节的 IV**（`credentials/gcm.rs:decrypt_factory_payload`，拆分前在 `credentials.rs`）
    - 长度块写成 `b2_bytes[15] = (iv.len() * 8) as u8`，256 被截成 0（应为
      `to_be_bytes()` 写进 `[8..16]`）；
    - 只喂了 IV 的前 16 字节，超过部分被丢掉，违反 NIST SP 800-38D 的
@@ -118,9 +137,10 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
   想换成 GitHub 私密邮箱 `284996397+Jules-0409@users.noreply.github.com` 需要改写全部历史
   并强推，这属于改 Git 身份，Droid 的规则不允许它自己动手，要 Jules 亲自跑。
   现成脚本：`tmp/rewrite-emails.ps1`（含备份与指纹核对，跑完可由 Droid 核对并强推）。
-- ⚠️ **macOS 侧没跑过**。这台是 Windows。`credentials.rs` 的 Keychain 分支、
-  `cursor.rs` 的 `security` 回退、`lib.rs` 的 macOS 私有 API 窗口行为
-  **都没在本机验证**。跨平台改动要特别小心。
+- ⚠️ **macOS 侧没跑过真接口**。写这份记录时用的机器是 Windows。
+  `credentials/keyring.rs` 的 Keychain 分支、`cursor/auth.rs` 的 `security` 回退、
+  `lib.rs` 的 macOS 私有 API 窗口行为 **都还没在有真实登录态的 macOS 上验证**
+  （macOS 上跑过的是单元测试，见上面拆模块那一段）。跨平台改动要特别小心。
 - ⚠️ **`quota-panel-tauri` 主程序（GUI）本轮没重新实跑**，只跑了 CLI 和测试。
   界面改的是「删掉 stale 徽章」，风险低，但透明窗口的问题靠日志发现不了，
   **下次动 UI 前应先 `cargo run` 看一眼，或至少渲染一次 `scripts/make-ui-preview.cjs`**。
@@ -147,8 +167,7 @@ c424ac5 Add a `quota` CLI sharing the GUI's fetchers
 
 1. **配置持久化**：刷新间隔 / 阈值写进配置文件 + 一个设置界面，
    解决 README「已知限制」第一条。
-2. **拆文件**：`credentials.rs`（677 行）和 `cursor.rs`（569 行）都超了 400 行 soft cap。
-3. **macOS 真机验证**：在真实 macOS 机器上构建并实跑，确认
+2. **macOS 真机验证**：在真实 macOS 机器上构建并实跑，确认
    Keychain 分支、`.app` 打包、无边框窗口行为。
    （CI 已在 macOS runner 上编译并跑通测试，但那不等于真机上跑得起来。）
 
